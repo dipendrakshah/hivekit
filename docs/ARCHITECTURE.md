@@ -110,9 +110,14 @@ Two loops, one codebase.
 
 **Worker loop**
 
-1. Fresh isolated session: task spec + only referenced inputs. No other workers' transcripts.
-2. Tool loop until `submit_result` or timeout.
-3. Structured result posted to the job graph; worker session archived.
+1. Fresh isolated session: task spec + only referenced inputs. No other workers' transcripts,
+   no thread history, **no credentials** — connector secrets are dereferenced inside the tool
+   executor, outside the model's view.
+2. Tool loop until `submit_result`, a cap of 8 tool calls, or timeout.
+3. Loop guard: the same tool called twice with the same arguments returns "you already did
+   that" instead of the result. Small models loop; catching it in code is cheaper than
+   catching it on the invoice.
+4. Structured result posted to the job graph; worker session archived.
 
 Workers never see operator chat beyond their task spec. Masters write specs weak models can follow: explicit paths, explicit output format, explicit "do not" list.
 
@@ -125,7 +130,60 @@ complete({ model, messages, tools, json_schema?, timeout_ms, max_tokens })
 
 Adapters: `openai_compat` (OpenRouter, Groq, Together, Fireworks, Ollama, LM Studio, custom base URL) and `anthropic`. Google optional later.
 
+Every call carries `{thread_id, job_id, task_id}`. It is a required field, so there is no code
+path that calls a model unattributed — which is why the spend log is complete rather than
+approximate.
+
 Catalog cache: on first use of a provider exposing `/models`, store id/context/price/modality; the Settings picker reads it; raw slugs always allowed. Hot swap: changing `models.worker` affects only newly spawned workers.
+
+### 4.4.1 Making weak models usable
+
+The single most important behaviour in the codebase, and the reason a free model can hold a
+worker seat at all.
+
+Capabilities come from the provider catalog where published and otherwise from a six-call
+probe (~2k tokens) run once per model and cached: echo, system-role adherence, tool call,
+JSON schema, long-input needle, instruction discipline.
+
+The same logical request is then rendered per model:
+
+| If the model has | The gateway does |
+| --- | --- |
+| Native tool calling | Uses it |
+| No native tool calling | Describes tools in the prompt; the model emits `<hk:call tool="…">{…}</hk:call>`; the gateway parses it |
+| JSON schema mode | Passes the schema — and validates anyway, because providers get this wrong |
+| No JSON mode | Inlines the schema with one worked example, validates, repairs |
+| No system role | Prepends to the first user message |
+| A small context | The master gives it fewer inputs — one document per worker, not the folder |
+
+Parsing is deliberately forgiving: the block is accepted anywhere in the reply, prose around
+it is tolerated, fenced variants are accepted, and trailing commas, single quotes, unquoted
+keys and smart quotes are repaired. Every repair is counted against that model, so Settings
+can show which of *your* models is actually reliable on *your* work — worth more than any
+benchmark.
+
+### 4.4.2 Verification order
+
+**Code verifies; a model judges only what code cannot.** In strict cost order:
+
+1. Transport — did the call succeed, is the output non-empty.
+2. Shape — does it parse; JSON schema validation.
+3. Success test — the plan's `success` sentence, evaluated as a check where it is mechanical:
+   file exists, field non-null, number in range, cited span actually contains the quoted text.
+4. Reviewer model — only for what code cannot judge (faithfulness, tone), and **only on a
+   different model from the one under review**. A model reviewing itself agrees with itself.
+
+Failures walk the ladder in PRD FR-A6: same model with the exact validator error, then a
+tighter spec, then the fallback model, then a question card. The error text is the whole
+value of the retry.
+
+### 4.4.3 Spend log
+
+A row per call with the model **requested** and the model **actually served** — gateways
+substitute, and an unattributed substitution makes cost analysis quietly wrong. Prices are
+snapshotted per row so a later price change does not rewrite history. When a provider returns
+no usage numbers the gateway estimates locally and flags the row `estimated` rather than
+blending a guess into a measurement.
 
 ### 4.5 Tool bus
 
@@ -140,6 +198,15 @@ Catalog cache: on first use of a provider exposing `/models`, store id/context/p
 | `email.fetch` (IMAP) | allow |
 | `email.send` (SMTP) | **always ask** |
 | `exec.run` | ask unless allowlisted |
+
+**Untrusted content reduces capability.** Anything from `web.fetch`, `rss.read` or
+`email.fetch` is tagged untrusted at ingest and the tag follows it into every prompt and
+derived artifact. A task whose context holds untrusted content has `site.push`, `x.post`,
+`email.send` and `exec.run` **removed from its tool list** — absent, not denied. So web-facing
+work is two hops: a reader worker returns structured findings with no ability to act, and the
+master acts on findings rather than on raw page text. Wrapping untrusted text in delimiters
+and telling the model not to obey it is necessary and not sufficient; this is the part that
+holds against a payload that fully convinces the model.
 
 Every "always ask" action writes an `Approval` receipt — action, diff/payload, deciding human, model used. Receipts are browsable; this is Hivekit's audit answer to the trust gap flagged in Grok Bot coverage.
 
@@ -162,7 +229,7 @@ packages/protocol   # frame + schema types (zod)
 packages/models     # adapters + catalog cache
 packages/tools      # tool bus + policies
 packages/connectors # site(git) · x(X API) · email(IMAP/SMTP)
-deploy/             # docker-compose.yml, Caddyfile, EC2/Fly guides
+deploy/             # docker-compose.yml, Dockerfile, Caddyfile, EC2 / Fly / Cloudflare guides
 ```
 
 SQLite via `better-sqlite3`, WAL mode. Backups = copy the volume.
@@ -172,7 +239,7 @@ SQLite via `better-sqlite3`, WAL mode. Backups = copy the volume.
 1. Owner passkey → session cookie → WSS auth. No multi-tenant anything.
 2. Tools refuse paths outside the data dir. No dynamic tool creation.
 3. External sends (push/tweet/email) are structurally unable to bypass approval cards.
-4. Untrusted content is wrapped; instructions inside it are never followed.
+4. Untrusted content is wrapped **and reduces capability** — a task holding it cannot see the external-send tools at all (§4.5). Wrapping alone is not a control.
 5. Budget circuit breaker stops new completions past `limits.budget_usd_per_job`.
 6. Every irreversible action leaves a receipt.
 

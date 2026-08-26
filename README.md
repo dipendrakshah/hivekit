@@ -47,7 +47,9 @@ OpenClaw is excellent and huge — a personal operating system with 26 channels.
 3. [docs/agents/AGENT_INSTRUCTIONS.md](docs/agents/AGENT_INSTRUCTIONS.md) — the operating contract for every model.
 4. [docs/ui/app.html](docs/ui/app.html) — UI mock (open in a browser; desktop + phone frames).
 5. [examples/example-jobs.md](examples/example-jobs.md) — paste-ready first jobs and routines.
-6. [todo/README.md](todo/README.md) — milestone backlog with definitions of done.
+6. [examples/instructions/](examples/instructions/README.md) — starting points for a thread's instructions field.
+7. [deploy/README.md](deploy/README.md) — EC2, any VM, Fly/Railway, Cloudflare; backup and connector credentials.
+8. [todo/README.md](todo/README.md) — milestone backlog with definitions of done.
 
 ## Design principles
 
@@ -55,7 +57,21 @@ OpenClaw is excellent and huge — a personal operating system with 26 channels.
 2. **BYOK, not a model company.** Keys are encrypted on your server and never leave it except to call your chosen providers.
 3. **Master plans, workers execute, humans approve risk.**
 4. **Boring infrastructure.** One Node process, SQLite, one volume. Backup = copy the volume.
-5. **Smaller than OpenClaw.** If a feature needs a second paragraph to explain, it probably belongs in v2.
+5. **Code verifies; models judge only what code cannot.** Schemas, arithmetic and citation
+   checks are free and certain. This is what makes a free worker model viable rather than
+   decorative.
+6. **Smaller than OpenClaw.** If a feature needs a second paragraph to explain, it probably belongs in v2.
+
+## Honest limits
+
+- Posting to X needs a paid API tier above a small allowance and is subject to X's automation
+  rules. `x.post` is approval-gated in every mode; there is no auto-post preset.
+- Gmail via API needs OAuth app verification to distribute — the supported path here is IMAP
+  with an app password, and SMTP through your own relay (VM IPs have deliverability problems).
+- Free and stealth model routes get withdrawn without notice and many retain prompts.
+  Fallbacks absorb the first; sensitive scopes refuse stealth providers for the second.
+- Always-on means a bill: $4–12/month for the VM plus model spend. A sleeping laptop cannot
+  run an 07:00 routine.
 
 ## Status
 

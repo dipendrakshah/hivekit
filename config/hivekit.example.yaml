@@ -28,16 +28,31 @@ models:
 
 limits:
   max_workers_per_job: 8
+  max_spawn_depth: 1                     # not configurable above 1
+  tool_calls_per_worker: 8               # plus a loop guard on repeated identical calls
   job_timeout_minutes: 45
   budget_usd_per_job: 2.00
+  budget_usd_per_day: 5.00               # across all threads; stops starting new jobs
 
 policy:
   mode: ask                              # ask | auto | strict
+  # Enforced in every mode. `auto` cannot override these, and neither can a routine.
+  always_ask:
+    - site.push
+    - x.post
+    - email.send
+    - exec.run
   exec_allowlist:
     - "git status"
     - "git diff"
   # Sensitive scopes refuse stealth providers unless allowed here:
   stealth_allowed_scopes: []             # e.g. [x] but never [email] by default
+  # A task holding untrusted (web/email) content loses these tools entirely.
+  untrusted_revokes:
+    - site.push
+    - x.post
+    - email.send
+    - exec.run
 
 providers:
   openrouter:

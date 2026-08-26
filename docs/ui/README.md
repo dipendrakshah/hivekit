@@ -6,6 +6,9 @@ One responsive web app served by the Gateway itself — desktop and phone are th
 | --- | --- |
 | Desktop | Thread with plan card, worker update, inline approval card (diff + approve/edit/deny), status rail with routines/connectors/spend |
 | Phone | Same thread, bottom tabs, approval card sized for a thumb |
+| Routine confirm | Plain language → `{cron, prompt, connectors, notify}` shown back as a card. Nothing persists until you tap Save |
+| Settings · models | The split-brain screen: master seat, worker seat, and what a swap would cost |
+| Receipts | Every irreversible action with payload, decider, model and timestamp |
 
 ## Patterns borrowed from Grok Bot (x.ai/bot)
 
@@ -29,3 +32,32 @@ One responsive web app served by the Gateway itself — desktop and phone are th
 - Font mono: `"IBM Plex Mono"`
 
 Do not replace this with a generic purple-on-navy AI dashboard. The product is a workshop thread, not a chatbot landing page.
+
+## Rules every screen follows
+
+1. **The thread is the interface.** If a daily action needs a separate console, the design is
+   wrong. Settings and Receipts exist for the things you do monthly, not daily.
+2. **Cost is always visible** — on the plan card, on the job rail, on the model settings.
+   Estimates are labelled as estimates and never blended into measured spend.
+3. **Which model did it is always visible**, including on an escalation: the model that failed
+   and the model that succeeded. That is how you learn which of your models to trust.
+4. **Nothing irreversible without the effect.** The diff, the tweet text, the email body. If an
+   effect genuinely cannot be previewed, the card says so rather than hiding it.
+5. **Failure is information.** Retries and escalations show in the plan card. A free worker
+   failing twice and a good one succeeding is the design working, not something to hide.
+6. **Never a spinner alone.** Every progress indicator is backed by a real task or token count.
+   "Is it stuck?" should never need asking.
+
+## Accessibility floor
+
+- Status is never colour-only — every pill carries a word (`ok`, `run`, `wait`), not just a hue.
+- The approval card is the one flow used under time pressure: fully labelled, and **Approve is
+  never the default focus**.
+- Diffs, tables and long payloads scroll inside their own container. The page body never
+  scrolls horizontally at 360 px.
+- Target Lighthouse a11y ≥ 90 on the thread view (see `todo/04-web-app.md`).
+
+## Not mocked
+
+First-run (passkey → key → model picker → sample prompt), the Jobs list, and the Connectors
+form. All conventional, and none carries a design decision worth arguing about in a mock.

@@ -91,6 +91,28 @@
     .mtab { display: flex; border-top: 1px solid var(--line); background: #16140f; }
     .mtab div { flex: 1; text-align: center; padding: 9px 0 13px; font-size: 11px; color: var(--mute); }
     .mtab div.on { color: var(--copper); }
+
+    /* ---------- added frames ---------- */
+    .mini { width: 460px; background: var(--bg); border: 1px solid #3a342c; border-radius: 12px;
+            overflow: hidden; box-shadow: 0 30px 60px #0007; }
+    .mini .hd { padding: 10px 14px; border-bottom: 1px solid var(--line); background: #191714;
+                font-size: 12px; color: var(--mute); font-family: "IBM Plex Mono", monospace; }
+    .mini .bd { padding: 14px; }
+    .lbl { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--mute);
+           margin: 0 0 6px; }
+    .fld { background: #0f0e0c; border: 1px solid var(--line); border-radius: 8px;
+           padding: 9px 11px; margin-bottom: 10px; font-size: 12.5px; }
+    .fld .hint { color: var(--mute); font-size: 11px; margin-top: 3px;
+                 font-family: "IBM Plex Mono", monospace; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tag { font-size: 10px; padding: 1px 7px; border-radius: 99px;
+           font-family: "IBM Plex Mono", monospace; border: 1px solid var(--line);
+           color: var(--mute); }
+    .tag.free { background: #1d2a1e; color: var(--sage); border-color: #2f4a32; }
+    .tag.warn { background: #2a2118; color: var(--warn); border-color: #4a3a1c; }
+    .rcpt { display: grid; grid-template-columns: 88px 1fr auto; gap: 10px; padding: 8px 0;
+            border-top: 1px solid #2a261f; font-size: 12px; align-items: baseline; }
+    .rcpt:first-of-type { border-top: 0; }
   </style>
 </head>
 <body>
@@ -212,6 +234,114 @@
           <input placeholder="Message the hive" style="padding:10px" />
         </div>
         <div class="mtab"><div class="on">Threads</div><div>Routines</div><div>Jobs</div><div>You</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="intro" style="padding-top:8px">
+    <h1>Supporting frames</h1>
+    <p>Routine confirm card, model settings, and the receipts log — the three screens that carry a design decision. Same palette, same thread idiom.</p>
+  </div>
+  <div class="row">
+
+    <!-- routine confirm -->
+    <div>
+      <p class="caption">In-thread · routine created from plain language</p>
+      <div class="mini">
+        <div class="hd">thread: site updates</div>
+        <div class="bd">
+          <div class="bubble op" style="max-width:none">
+            <div class="who">YOU</div>
+            <div class="body">Every morning at 07:00 IST, scan my five sources, draft an update for the site repo, and show me the diff before pushing.</div>
+          </div>
+          <div class="approve" style="max-width:none;margin-top:12px">
+            <h4>Save this routine?</h4>
+            <div class="split" style="margin-top:8px">
+              <div><p class="lbl">When</p><div class="fld">daily 07:00<div class="hint">Asia/Kolkata · next 06:59 tomorrow</div></div></div>
+              <div><p class="lbl">Notify</p><div class="fld">on-approval-only<div class="hint">ping only when I need you</div></div></div>
+            </div>
+            <p class="lbl">Connectors it may use</p>
+            <div style="margin-bottom:10px"><span class="tag">web</span> <span class="tag">site</span>
+              <span class="tag warn">site.push always asks</span></div>
+            <p class="lbl">Prompt it will run</p>
+            <div class="fld" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px">Scan sources in the thread's source list. Fact-check the two best items with quotes and dates. Draft a post in the site voice. Commit to branch routine/&lt;date&gt;. Show the diff.</div>
+            <div class="btnrow">
+              <button class="btn">Save routine</button>
+              <button class="btn ghost">Edit prompt</button>
+              <button class="btn danger">Cancel</button>
+            </div>
+          </div>
+          <p class="caption" style="margin:12px 0 0">Nothing persists until you tap Save. Run it once as a normal message first — the confirm card is where you discover the prompt was ambiguous.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- models -->
+    <div>
+      <p class="caption">Settings · models — the split-brain screen</p>
+      <div class="mini">
+        <div class="hd">settings / models</div>
+        <div class="bd">
+          <p class="lbl">Master — plans, merges, decides</p>
+          <div class="fld">anthropic/claude-sonnet-4.6
+            <div class="hint">$3.00 / $15.00 per M · 2 calls per job · 90% of spend</div></div>
+
+          <p class="lbl">Worker — the volume, up to 8 in parallel</p>
+          <div class="fld">stealth/ox-alpha <span class="tag free">free</span> <span class="tag warn">no native tools</span>
+            <div class="hint">text shim + repair · 88% first-try on your jobs</div></div>
+
+          <p class="lbl">Reviewer</p>
+          <div class="fld" style="color:var(--mute)">off — deferred to v1.1
+            <div class="hint">when on, must differ from the worker model</div></div>
+
+          <div class="approve" style="max-width:none">
+            <h4>What a swap would cost</h4>
+            <div style="font-size:12.5px">Moving the worker seat to <code>claude-sonnet</code> takes a
+              morning routine from <b>$0.03</b> to about <b>$0.34</b> and lifts first-try accuracy
+              from 88% to ~97%. The retry ladder already covers most of that gap.</div>
+          </div>
+
+          <p class="caption" style="margin:10px 0 0">Changing a model applies to newly spawned workers. In-flight workers finish on the old one. No restart.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- receipts -->
+    <div>
+      <p class="caption">Receipts · every irreversible action, browsable</p>
+      <div class="mini">
+        <div class="hd">receipts · 4 shown</div>
+        <div class="bd">
+          <div class="rcpt">
+            <span class="pill ok">approved</span>
+            <div>site.push → main<div class="hint" style="color:var(--mute);font-size:11px;font-family:'IBM Plex Mono',monospace">a91f2c3 · +1 post, ~index.html · claude-sonnet</div></div>
+            <span class="mono">07:04</span>
+          </div>
+          <div class="rcpt">
+            <span class="pill wait">denied</span>
+            <div>x.post<div class="hint" style="color:var(--mute);font-size:11px;font-family:'IBM Plex Mono',monospace">"too promotional" · draft kept · ox-alpha</div></div>
+            <span class="mono">07:11</span>
+          </div>
+          <div class="rcpt">
+            <span class="pill ok">approved</span>
+            <div>email.send → client<div class="hint" style="color:var(--mute);font-size:11px;font-family:'IBM Plex Mono',monospace">re: invoice 8823 · 2 edits before send</div></div>
+            <span class="mono">Aug 25</span>
+          </div>
+          <div class="rcpt">
+            <span class="pill run">auto</span>
+            <div>site.commit (branch)<div class="hint" style="color:var(--mute);font-size:11px;font-family:'IBM Plex Mono',monospace">no approval needed — local branch only</div></div>
+            <span class="mono">Aug 25</span>
+          </div>
+
+          <div class="approve" style="max-width:none;margin-top:14px">
+            <h4>Why receipts exist</h4>
+            <div style="font-size:12.5px">Every always-ask action stores the payload or diff, the
+              deciding human, the model that proposed it, and the timestamp. This is the audit
+              answer to the trust gap in hosted agent products: you can go back and see exactly
+              what was done on your behalf, and who said yes.</div>
+          </div>
+        </div>
       </div>
     </div>
 
