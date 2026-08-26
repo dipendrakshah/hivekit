@@ -96,6 +96,8 @@ Frame types (complete list):
 
 Idempotency keys on `job.approve`, `job.cancel`, `routine.create`.
 
+**WS keepalive:** Bun.serve ping interval **25 s** (idle timeout 60 s); client reconnects on close.
+
 ### 4.2 Data model
 
 ```
