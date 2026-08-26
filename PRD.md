@@ -188,8 +188,9 @@ Each thread owns a directory on the data volume. Two markdown files, not six.
 
 ## 8. Non-functional requirements
 
-- NFR-1. Single Node process + SQLite (WAL). No second database. One volume to back up.
+- NFR-1. Single Bun process + SQLite (WAL). No second database. One volume to back up.
 - NFR-2. Gateway restart < 5 s; jobs resume from persisted state after crash/reboot.
+- NFR-2a. Chat latency ≈ model TTFB: first token = provider TTFB + <5 ms relay; total per-turn gateway overhead <20 ms p50, <100 ms p99 (locked stack: ARCHITECTURE §1.1).
 - NFR-3. First token latency ≈ provider TTFB + < 100 ms gateway overhead.
 - NFR-4. Runs comfortably on 1 vCPU / 1 GB RAM (EC2 t4g.nano class).
 - NFR-5. Single-operator. One admin token/passkey. No team IAM in v1.

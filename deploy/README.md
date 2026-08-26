@@ -1,6 +1,6 @@
 # Deploying Hivekit
 
-One container, one volume, one hostname. The gateway is a single Node process holding the
+One container, one volume, one hostname. The gateway is a single Bun process holding the
 web app, the WSS thread, the agent loops, the routine scheduler and the connectors, with
 SQLite (WAL) on a persistent disk.
 
@@ -67,7 +67,7 @@ docker compose -f deploy/docker-compose.yml up -d
 **Storage:** put `/var/lib/docker/volumes` on its own EBS volume and snapshot it. It holds the
 database, the vault and every artifact — the entire state of the hive.
 
-**Swap:** on `t4g.nano`, add 1 GB of swap. Node plus a build step will otherwise OOM during
+**Swap:** on `t4g.nano`, add 1 GB of swap. The image build will otherwise OOM during
 `docker compose up --build`. Build elsewhere and pull the image if you can.
 
 ---

@@ -8,7 +8,26 @@ Reference shape: Grok Bot (thread UX, parallel bots, inline approvals, routines)
 
 ## 1. One-sentence architecture
 
-A single **Node process** serves the web app, speaks WSS to browsers, runs the agent loops, fires routine crons, and talks to connectors — all state in one SQLite file on one volume, deployable by `docker compose up` on any small VM.
+A single **Bun process** serves the web app, speaks WSS to browsers, runs the agent loops, fires routine crons, and talks to connectors — all state in one SQLite file on one volume, deployable by `docker compose up` on any small VM.
+
+### 1.1 Locked stack
+
+Chosen so chat latency ≈ model TTFB — nothing we control adds a visible hop.
+
+| Layer | Pick | Why it is the fast path |
+| --- | --- | --- |
+| Runtime | **Bun** (Node 22 documented as fallback target, not built twice) | Native WebSocket, built-in SQLite (no FFI), ~40 ms cold start |
+| HTTP/WSS | `Bun.serve` raw — no framework on the hot path | ~6 routes; a router adds µs, a framework adds middleware chains |
+| Schemas | Zod v4, validated only at the WS frame boundary | Parse once; typed objects internally |
+| DB | `bun:sqlite`, WAL, prepared statements, raw SQL, `synchronous=NORMAL` | Sync writes ≈ 100 µs; zero ORM query planning |
+| Model calls | Plain `fetch` against OpenAI-compatible `/chat/completions` (Anthropic translated); no vendor SDKs | SDKs add buffering layers and version drift; streaming stays byte-faithful |
+| Token relay | Chunks → WS immediately; thread rows flushed every ~250 ms and on finish, never per token | First token = provider TTFB + <5 ms of ours |
+| Frontend | Preact + Vite; optimistic local echo; virtualized thread | ~4 KB runtime; instant-send feel regardless of RTT |
+| Scheduler | croner, in-process, persisted in SQLite | A Redis/queue hop costs more than cron itself |
+| Connectors | `fetch`; shell-out to system git; `imapflow` for IMAP | Zero heavy deps |
+| Deploy | oven/bun multi-stage → slim image, Caddy TLS, volume for the `.db` | See [deploy/](../deploy/README.md) |
+
+Per-turn gateway overhead target: **<20 ms p50, <100 ms p99** (PRD NFR-2).
 
 ```
  Operator (desktop or phone browser)
@@ -130,7 +149,7 @@ complete({ model, messages, tools, json_schema?, timeout_ms, max_tokens })
   -> stream | object
 ```
 
-Adapters: `openai_compat` (OpenRouter, Groq, Together, Fireworks, Ollama, LM Studio, custom base URL) and `anthropic`. Google optional later.
+Adapters: `openai_compat` (OpenRouter, Groq, Together, Fireworks, Ollama, LM Studio, custom base URL) and `anthropic`. Google optional later. Both are plain `fetch` against the provider endpoint — no vendor SDKs on the hot path; streaming passes through byte-faithful.
 
 Every call carries `{thread_id, job_id, task_id}`. It is a required field, so there is no code
 path that calls a model unattributed — which is why the spend log is complete rather than
@@ -218,7 +237,7 @@ Every "always ask" action writes an `Approval` receipt — action, diff/payload,
 
 ### 4.6 Scheduler
 
-In-process cron (node-cron semantics persisted in SQLite so reboot-safe). Routines are authored in natural language: the master model converts the request into `{cron, prompt_template, connectors, notify}`, shown back as a confirm card before anything persists. Each tick enqueues a synthetic operator message ("[routine] morning-site-update fired") into the routine's thread; missed ticks while down run once on boot, flagged late. Notify policies: `always`, `on-approval-only` (default), `silent-until-done`; outbound pings use email digest via the operator's SMTP.
+In-process cron via **croner** (schedule state persisted in SQLite so reboot-safe). Routines are authored in natural language: the master model converts the request into `{cron, prompt_template, connectors, notify}`, shown back as a confirm card before anything persists. Each tick enqueues a synthetic operator message ("[routine] morning-site-update fired") into the routine's thread; missed ticks while down run once on boot, flagged late. Notify policies: `always`, `on-approval-only` (default), `silent-until-done`; outbound pings use email digest via the operator's SMTP.
 
 ### 4.7 Vault & auth
 
@@ -314,8 +333,8 @@ than one thread.
 ## 5. Repository layout
 
 ```
-apps/gateway        # Node daemon: HTTP+WSS, agents, scheduler, serves apps/web build
-apps/web            # responsive UI (Preact/React), desktop + mobile layouts
+apps/gateway        # Bun daemon: HTTP+WSS (Bun.serve), agents, scheduler, serves apps/web build
+apps/web            # responsive UI (Preact + Vite), desktop + mobile layouts
 packages/protocol   # frame + schema types (zod)
 packages/models     # adapters + catalog cache
 packages/tools      # tool bus + policies
@@ -323,7 +342,7 @@ packages/connectors # site(git) · x(X API) · email(IMAP/SMTP)
 deploy/             # docker-compose.yml, Dockerfile, Caddyfile, EC2 / Fly / Cloudflare guides
 ```
 
-SQLite via `better-sqlite3`, WAL mode. Backups = copy the volume.
+SQLite via `bun:sqlite`: WAL mode, prepared statements, raw SQL (`synchronous=NORMAL`), no ORM. Backups = copy the volume.
 
 ## 6. Security model summary
 

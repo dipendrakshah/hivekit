@@ -56,7 +56,7 @@ OpenClaw is excellent and huge — a personal operating system with 26 channels.
 1. **Thread is the interface.** Tasks, plans, approvals, artifacts all live in one chat. No workflow builder, ever.
 2. **BYOK, not a model company.** Keys are encrypted on your server and never leave it except to call your chosen providers.
 3. **Master plans, workers execute, humans approve risk.**
-4. **Boring infrastructure.** One Node process, SQLite, one volume. Backup = copy the volume.
+4. **Boring infrastructure.** One Bun process, SQLite, one volume. Backup = copy the volume.
 5. **Code verifies; models judge only what code cannot.** Schemas, arithmetic and citation
    checks are free and certain. This is what makes a free worker model viable rather than
    decorative.

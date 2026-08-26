@@ -4,9 +4,11 @@ Goal: `docker compose up` on a fresh VM yields an authenticated Hivekit that can
 
 ## Work
 
-- [ ] Monorepo scaffold: `apps/gateway`, `apps/web`, `packages/{protocol,models,tools,connectors}`; TypeScript, Node 22+.
+- [ ] Monorepo scaffold: `apps/gateway`, `apps/web`, `packages/{protocol,models,tools,connectors}`; TypeScript on **Bun** (Node 22 documented as fallback target, not built twice).
+- [ ] `Bun.serve` raw for HTTP+WSS (~6 routes, no framework); Zod validation only at the WS frame boundary.
+- [ ] SQLite via `bun:sqlite` (WAL, prepared statements, raw SQL, `synchronous=NORMAL`) with migrations for: threads, messages, jobs, tasks, routines, approvals, settings, vault.
+- [ ] Token relay: stream chunks to WS immediately; flush message rows every ~250 ms and on completion — never per token.
 - [ ] Config loader for `config/hivekit.example.yaml` shape + env overrides (`HIVEKIT_TOKEN`, `HIVEKIT_MASTER_KEY`, `PUBLIC_URL`).
-- [ ] SQLite (better-sqlite3, WAL) with migrations for: threads, messages, jobs, tasks, routines, approvals, settings, vault.
 - [ ] Vault: AES-256-GCM encrypt/decrypt keyed by `HIVEKIT_MASTER_KEY`; redaction helper (`sk-***`) applied to all log paths.
 - [ ] HTTP server serving static UI build + WSS at `/ws`; frame protocol `req.hello` / `req.chat.send` / events per ARCHITECTURE §4.1.
 - [ ] Auth: first-login owner passkey, signed session cookies, single operator.
@@ -34,6 +36,7 @@ Goal: `docker compose up` on a fresh VM yields an authenticated Hivekit that can
 - [ ] `SIGKILL` mid-job then restart reproduces the exact job state — an actual kill, not a graceful shutdown.
 - [ ] Leak suite: synthetic keys of every provider shape **plus a custom shape**, at every nesting depth including inside `Error.cause`, never appear in logs, thread transcripts, WS frames or error reports. Runs on every PR.
 - [ ] `docker compose -f deploy/docker-compose.yml up -d` reaches a healthy container on a clean machine, verified by CI.
+- [ ] Loopback latency probe: a chat turn's gateway overhead (frame in → first chunk relayed) measures <20 ms p50 / <100 ms p99 over the provider stream, logged per request.
 - [ ] Editing `INSTRUCTIONS.md` over SSH is picked up by the next job with no restart; editing it in Settings changes the file on disk. One store, no drift.
 - [ ] A `SIGKILL` during a memory write leaves the previous `MEMORY.md` intact and parseable — never a half file.
 - [ ] A worker asked for `MEMORY.md` is refused; a test asserts it is absent from the worker's rendered prompt.

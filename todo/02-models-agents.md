@@ -4,7 +4,7 @@ Goal: the master plans and spawns parallel workers on configurable models; spend
 
 ## Work
 
-- [ ] Model adapters: `openai_compat` (OpenRouter default, custom base URLs) + `anthropic`; streaming into thread events.
+- [ ] Model adapters: `openai_compat` (OpenRouter default, custom base URLs) + `anthropic`; plain `fetch`, no vendor SDKs; streaming into thread events.
 - [ ] Call metadata `{thread_id, job_id, task_id}` required on every completion — an unattributed call must be a compile error, not a convention.
 - [ ] Capability probe (6 cheap calls, cached): system role, native tools, JSON schema, long-input recall, instruction discipline.
 - [ ] Capability-aware rendering: native tools where present; `<hk:call>` text shim where absent; schema inlined with a worked example where there is no JSON mode; prepend-to-first-user-message where there is no system role.
