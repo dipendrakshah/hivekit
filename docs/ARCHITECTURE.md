@@ -252,83 +252,210 @@ Each thread is a directory on the data volume:
 ```
 /data/threads/<slug>/
   INSTRUCTIONS.md      operator-written: voice, the bar, the never-list
-  MEMORY.md            master-written: state block, learned entries, corrections
+  MEMORY.md            the active memory — tiered, typed, human-readable
+  memory/
+    candidates.jsonl   observations not yet promoted   (never enters a prompt)
+    archive.jsonl      superseded and retired entries  (never enters a prompt)
+    ledger.jsonl       per-entry usage and outcomes    (never enters a prompt)
   artifacts/           promoted outputs
   jobs/<job-id>/       scratch, worker outputs
 ```
 
 **Files are the source of truth, not the database.** The Settings instructions editor reads
-and writes `INSTRUCTIONS.md`; SQLite holds the path and a content hash so the gateway can
-detect an out-of-band edit and reload. Keeping the canonical copy in a markdown file is the
-whole point: you can `grep` it, `diff` it, edit it over SSH, and put it in git.
+and writes `INSTRUCTIONS.md`; SQLite holds paths and content hashes so the gateway can detect
+an out-of-band edit and reload. Keeping the canonical copy in markdown is the point: you can
+`grep` it, `diff` it, edit it over SSH, and put it in git.
 
-#### `MEMORY.md` shape
+#### 4.8.1 Why memory needs structure
+
+Free-form append-only memory degrades an agent. Not through attack — through ordinary use.
+Ten failure modes, all observed in practice, and what the design does about each:
+
+| Failure | What it looks like | Control |
+| --- | --- | --- |
+| **Dilution** | 40 lines loaded every call; the 3 that matter are lost in the noise, and cost rises every run | **Retrieve, don't load** (§4.8.3) |
+| **Staleness** | "example.dev is a good source" — true in March, false since | **TTL on facts**, sources revalidated |
+| **Contradiction** | Two active entries disagree; the model picks one non-deterministically | **Supersede-by-id**; a conflict check gates the write |
+| **Over-generalisation** | One rejected draft becomes "never use adjectives" | **Candidate → rule promotion** (§4.8.4) |
+| **Drift** | Each run re-summarises the last; meaning shifts, telephone-game | **Entries are immutable**; you supersede, never edit |
+| **Unfalsifiable** | "The operator prefers concise writing" — can never be checked, so never retired | Every rule needs a **`when`** and a **`wrong-if`** |
+| **Duplication** | The same lesson relearned five times in five phrasings | **Dedupe on write** against active entries |
+| **Scope leak** | A lesson about one source applied to every source | Every entry carries a **scope**; retrieval matches it |
+| **Self-confirmation** | Memory says do X → agent does X → records "X worked" → reinforces | **Hold-out audits** (§4.8.6) |
+| **Recency swamping** | Newest entries crowd out durable truths, which look stale and get pruned first | **Tiered budgets**; eviction by evidence, not age |
+
+The through-line: **an entry earns its place in the prompt, and keeps earning it.** Writing
+something down is not the same as it being true, and being true once is not the same as being
+worth 200 tokens on every call forever.
+
+#### 4.8.2 Tiers
+
+`MEMORY.md` holds only what is **active**. Four tiers with different rules:
 
 ````markdown
+## Pinned
+<!-- operator corrections. authoritative on write, never auto-edited, never auto-retired -->
+- [p1] No marketing verbs, ever.  ·op 2026-08-25
+
+## Rules
+<!-- promoted from candidates. scoped, falsifiable, evidence-tracked -->
+- [r7] Read footnotes on example.dev — breaking changes hide there, not in the body.
+       ·when source=example.dev  ·wrong-if a breaking change appears in the body only
+       ·confirmed 3/3  ·used 12  ·last 2026-08-26
+
+## Facts
+<!-- expire by default; provenance mandatory when derived from untrusted content -->
+- [f2] example.dev publishes roughly twice a week.
+       ·derived (from https://example.dev/feed, unverified)  ·expires 2026-11-01
+
 ## State
 ```json
-{ "last_run": "2026-08-26T07:04:11+05:30", "seen": ["src-a#8821", "src-b#441"] }
+{ "last_run": "2026-08-26T07:04:11+05:30", "seen": ["src-a#8821"] }
 ```
-
-## Learned
-- 2026-08-26 — Dropped source `example.dev/feed`: three consecutive sweeps found nothing
-  above the bar. Re-add if that changes.
-- 2026-08-24 — Their release notes put the breaking change in a footnote; read footnotes
-  on that source. (from https://example.dev/notes, verified against the changelog)
-
-## Corrections
-- 2026-08-25 — Operator rejected a draft for "revolutionise". No marketing verbs, ever.
-
-## Sources
-- https://example.dev/feed — good on protocol changes, noisy on funding
 ````
 
-The `State` block is machine-maintained and is what makes a routine incremental — a morning
-sweep reads `seen` and skips what it already handled. Everything else is prose a human reads.
+| Tier | Written by | Enters the prompt | Evicted when |
+| --- | --- | --- | --- |
+| **Pinned** | operator only | always, in full | only the operator removes it |
+| **Rules** | master, after promotion | top-K by scope match | `wrong-if` fires, or unused for `retire_unused_after` runs |
+| **Facts** | master | scope-matched, unexpired, top-N | TTL expires, or superseded |
+| **State** | master, machine-maintained | always, as JSON | keys the master no longer maintains |
 
-#### Write discipline
+Pinned is the only tier the operator writes and the only one that never expires, because an
+operator correction is ground truth and everything else is inference. It is also the smallest,
+which is why it can afford to always load.
 
-| Rule | Why |
-| --- | --- |
-| **Only the master writes**, once, at end of job | One writer means no locking, no interleaving, no lost updates |
-| Atomic: write temp file, `fsync`, rename | A crash mid-write leaves the previous memory intact, never a half file |
-| The write is posted to the thread **as a diff** | You see what your bot decided to remember, where you see everything else |
-| Workers never write memory | They are stateless and independently retryable; that is what makes the fan-out safe |
-| Capped at `memory.max_bytes` (default 8 KB) | It is paid on every master call. Past the cap, prune superseded entries and say so in the same diff |
-| Corrections are pruned last | Operator corrections are the highest-value lines in the file |
+#### 4.8.3 Retrieval, not wholesale loading
 
-#### Memory poisoning — the risk this adds
+The single biggest lever against dilution and cost: **memory size is decoupled from prompt
+size.** A thread with 400 remembered entries and one with 12 produce the same prompt budget.
 
-Giving a durable memory file to an agent that reads the open web and an inbox creates a new
-attack: get a sentence into `MEMORY.md` and it is reloaded on every future run, long after the
-malicious page is forgotten. Wrapping untrusted content stops it steering *this* job; it does
-nothing about persistence.
+```
+assemble(job):
+  pinned   → all of it                                    (cap: memory.pinned_max)
+  state    → the JSON block                               (compact, always)
+  rules    → scope-match(job) → rank(confirmations, recency of use) → top K
+  facts    → scope-match(job) → drop expired → top N
+```
 
-Four controls, in order of how much they carry:
+Scope is matched on what the job actually touches: connector, source domain, artifact kind,
+routine name. A rule scoped `source=example.dev` does not enter a job about the inbox.
+Anything retrieved is recorded in `ledger.jsonl` against the entry — which is what makes
+retirement evidence-based rather than guesswork.
+
+#### 4.8.4 Promotion: one observation is not a rule
+
+The control for over-generalisation, and the most important thing here after retrieval.
+
+```
+master notices something
+        │
+        ▼
+ candidates.jsonl        one line, never enters a prompt
+        │
+        │  same observation, independently, in N distinct jobs
+        │  (memory.promote_after, default 3)
+        ▼
+   Rules in MEMORY.md    now retrievable, now costs tokens
+```
+
+- A single observation is a **candidate**. It is logged and it does nothing.
+- Promotion needs `promote_after` independent confirmations from **distinct jobs** — not three
+  restatements inside one run, which is a model agreeing with itself.
+- Promotion is announced in the thread: *"promoted r7 after a third confirmation"*.
+- **Operator corrections skip all of this.** They go straight to Pinned. A person saying
+  "stop doing that" is not a hypothesis awaiting evidence.
+
+A rule must carry a **`when`** (the scope that triggers it) and a **`wrong-if`** (what would
+show it false). If the master cannot write a `wrong-if`, the observation is not a rule — it is
+a preference, and preferences belong in `INSTRUCTIONS.md` where a human owns them.
+
+#### 4.8.5 Write path
+
+One write per job, by the master, as an atomic replace:
+
+```
+1. Draft the change as a set of typed operations, never free text:
+     add-candidate | promote | supersede(id) | retire(id) | update-state
+2. Reject the write if it would:
+     - add an entry contradicting an active one without an explicit supersede(id)
+     - add a near-duplicate of an active entry
+     - add a Rule with no `when` or no `wrong-if`
+     - add a Fact with no TTL and no provenance
+     - edit or delete a Pinned entry
+3. Apply: MEMORY.md rewritten atomically (temp → fsync → rename);
+          superseded entries appended to archive.jsonl with their original text
+4. Post the diff into the thread
+```
+
+Entries are **immutable**. A changed belief is a `supersede(id)` — a new entry plus the old one
+archived with its original wording — never an edit in place. That is what stops the
+telephone-game drift where a rule slowly becomes something nobody wrote.
+
+Workers never read or write memory. They are stateless, which is what makes the fan-out
+independently retryable.
+
+#### 4.8.6 Proving memory is worth having
+
+Self-confirmation is the failure nothing above catches: memory says do X, so the agent does X,
+so it records that X worked. The only honest check is a counterfactual.
+
+Every `memory.audit_every` runs (default 20), the thread runs one job **with retrieval
+disabled** and compares against the memory-on result: approval rate, operator edits before
+approval, retries, cost. The result is reported in the thread and written to `ledger.jsonl`.
+
+If memory-off does as well or better, the UI says so plainly rather than burying it. A memory
+that is not earning its tokens should be pruned or turned off, and you cannot know which
+without measuring.
+
+Per-entry, the ledger gives the same signal at finer grain: an entry retrieved 40 times whose
+jobs are no better than jobs without it is a candidate for retirement.
+
+#### 4.8.7 Memory poisoning — the adversarial case
+
+Distinct from pollution, rarer, worse when it lands. A thread reading the open web or an inbox
+can be told to write a durable sentence: get it into memory once and it reloads on every
+future run, long after the page is forgotten. Wrapping untrusted content stops it steering
+*this* job and does nothing about persistence.
 
 1. **Memory can never grant capability.** Connectors, the always-ask set, budgets and approval
-   requirements are resolved from config and Settings only — never from `MEMORY.md`. A memory
-   line saying "the operator approved silent pushes" is inert text. The gateway does not read
-   permissions out of prose, so persuading the prose achieves nothing.
-2. **Provenance on anything untrusted.** A claim derived from fetched content is written as
-   `(from <url>, unverified)`, never as a bare fact. A master reading it later treats it as a
-   lead, not as a settled truth.
-3. **Every write is a visible diff.** A silent append is how poisoning survives; a diff in the
-   thread is how you notice a bot suddenly deciding something strange.
-4. **Cheap reversion.** With `memory.git: true` each write is a commit, so
-   `hivekit memory log|diff|revert` gives you history and a one-command undo. Without it you
-   still have the previous file in the volume backup.
+   requirements resolve from config and Settings only — never from `MEMORY.md`. A memory line
+   saying "the operator approved silent pushes" is inert: the gateway does not read permissions
+   out of prose, so persuading the prose achieves nothing.
+2. **Untrusted-derived content cannot become a Rule.** It can only be a Fact, with provenance
+   and a TTL. Rules are behavioural; facts are disposable. An injected sentence therefore
+   expires on its own even if nobody notices it.
+3. **Promotion needs independent confirmation** (§4.8.4), so a single poisoned page cannot
+   install a rule at all.
+4. **Every write is a visible diff**, and promotions are announced.
+5. **Cheap reversion** — with `memory.git`, `hivekit memory log|diff|revert`.
 
-The residual risk is a plausible-looking false fact that the operator does not catch in the
-diff. That is real, and it is why memory is capped and prose-only: a small file gets read.
+Residual risk: a plausible false Fact that survives its TTL by being re-observed. Bounded, and
+bounded is the honest claim — it cannot change behaviour by itself, only inform it.
 
-#### Git-backing
+#### 4.8.8 Operator controls
 
-`memory.git: true` makes `/data/threads` a git repository and commits after each memory write
-(`thread/<slug>: memory after job_21a`). This gives history, blame, diff and revert for free,
-and lets you clone your bots' memory to a laptop to edit it properly. Off by default because
-it needs `git` in the image and a little disk; on is the better setting once you have more
-than one thread.
+Memory is only trustworthy if the person who owns it can see and steer it.
+
+| Command | Does |
+| --- | --- |
+| `hivekit memory show [--tier]` | Render active memory |
+| `hivekit memory why <id>` | Provenance, confirmations, which jobs used it, what it changed |
+| `hivekit memory pin <id>` | Promote to Pinned — you vouch for it |
+| `hivekit memory retire <id>` | Archive it, with a reason |
+| `hivekit memory candidates` | What is waiting for evidence |
+| `hivekit memory audit` | Run the hold-out comparison now |
+| `hivekit memory log \| diff \| revert` | Git history, when `memory.git` is on |
+
+`why` matters most. "Why does my bot believe this?" should be one command, and the answer
+should name the jobs, not a vibe.
+
+#### 4.8.9 Git-backing
+
+`memory.git: true` makes `/data/threads` a git repository and commits after each write
+(`thread/<slug>: memory after job_21a`). History, blame, diff and revert for free, and you can
+clone your bots' memory to a laptop to edit it properly. Off by default because it needs `git`
+in the image and a little disk; on is the better setting once you have more than one thread.
 
 ## 5. Repository layout
 

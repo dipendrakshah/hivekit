@@ -31,9 +31,28 @@ models:
 threads_dir: /data/threads
 
 memory:
-  max_bytes: 8192          # loaded on every master call, so this is paid repeatedly
-  git: false               # true = commit each memory write; enables `hivekit memory log|revert`
-  diff_in_thread: true     # post the memory diff into the thread. Leave this on.
+  # Prompt budget. Memory SIZE is decoupled from prompt size — only retrieved
+  # entries are loaded, so a thread with 400 entries costs the same as one with 12.
+  pinned_max_bytes: 1024     # operator corrections, always loaded in full
+  rules_top_k: 8             # scope-matched, ranked by confirmations + recent use
+  facts_top_n: 4             # scope-matched, unexpired
+
+  # Promotion. One observation is a candidate and does nothing; it becomes a Rule
+  # only after this many independent confirmations in DISTINCT jobs.
+  # Operator corrections skip this and go straight to Pinned.
+  promote_after: 3
+
+  # Decay. Rules retire when unused; Facts expire on their own TTL.
+  retire_unused_after_runs: 30
+  default_fact_ttl_days: 90
+
+  # Hold-out audit: every N runs, do one job with retrieval OFF and compare
+  # approval rate, operator edits, retries and cost. Catches memory that is not
+  # earning its tokens — the failure no other control detects.
+  audit_every: 20
+
+  git: false                 # commit each write; enables `hivekit memory log|diff|revert`
+  diff_in_thread: true       # post the memory diff into the thread. Leave this on.
 
 limits:
   max_workers_per_job: 8

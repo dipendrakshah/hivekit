@@ -9,7 +9,7 @@ One responsive web app served by the Gateway itself — desktop and phone are th
 | Routine confirm | Plain language → `{cron, prompt, connectors, notify}` shown back as a card. Nothing persists until you tap Save |
 | Settings · models | The split-brain screen: master seat, worker seat, and what a swap would cost |
 | Receipts | Every irreversible action with payload, decider, model and timestamp |
-| Thread memory | `MEMORY.md` with the last write as a diff, corrections, the state block, and revert |
+| Thread memory | The four tiers, what was actually retrieved for this job, candidates awaiting evidence, and the hold-out audit |
 
 ## Patterns borrowed from Grok Bot (x.ai/bot)
 
@@ -51,6 +51,9 @@ Do not replace this with a generic purple-on-navy AI dashboard. The product is a
 7. **Memory writes are visible.** What a bot decides to remember lands in the thread as a diff,
    never as a silent append — a durable false belief is far more expensive than a wrong answer,
    and the diff is where you catch it.
+8. **Show what was retrieved, not what is stored.** The memory screen leads with the handful of
+   entries that actually entered this job's prompt, and says how many did not. Storage is a
+   number; retrieval is what changed the answer.
 
 ## Accessibility floor
 

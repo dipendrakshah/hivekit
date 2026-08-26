@@ -10,7 +10,12 @@ template files and not a blob in SQLite:
 | File | Written by | Purpose |
 | --- | --- | --- |
 | `INSTRUCTIONS.md` | you | voice, the bar for what is worth acting on, the never-list |
-| `MEMORY.md` | the master, once per job | state block, learned entries, your corrections |
+| `MEMORY.md` | the master, once per job | active memory in four tiers: Pinned · Rules · Facts · State |
+| `memory/*.jsonl` | the master | candidates, archive, usage ledger — **never enter a prompt** |
+
+Memory is **retrieved, not loaded**: a job sees Pinned, State, and the top-K Rules and Facts
+whose scope matches it. A thread with 400 remembered entries costs the same per call as one
+with 12 ([ARCHITECTURE §4.8.3](../ARCHITECTURE.md)).
 
 The Settings editor reads and writes `INSTRUCTIONS.md` directly; SQLite stores only the path
 and a content hash, so there is one store and nothing to drift. Connector notes (site / x /
@@ -31,7 +36,10 @@ skills system (PRD §4).
 | --- | --- | --- |
 | `AGENT_INSTRUCTIONS.md` (role slice) | ~700 tok | this folder, baked in |
 | `INSTRUCTIONS.md` | ~600 tok | `/data/threads/<slug>/` — the file *is* the Settings field |
-| `MEMORY.md` | ~800 tok (8 KB cap) | `/data/threads/<slug>/` — master-written, master-only |
+| Memory · Pinned | ~150 tok | operator corrections, always loaded in full |
+| Memory · State | ~100 tok | machine JSON for routine incrementality |
+| Memory · Rules | ~400 tok | **top-K scope-matched only**, not the whole file |
+| Memory · Facts | ~150 tok | scope-matched, unexpired |
 | Connector notes | ~300 tok | Gateway, only for connectors in scope |
 | Thread history / routine trigger | varies | SQLite |
 | Task spec + declared inputs | remainder | the plan (workers only) |

@@ -25,7 +25,8 @@ Goal: the three v1 connectors work end to end, and recurring jobs run unattended
 - [ ] VM reboot mid-routine: catch-up run executes once and is labeled late.
 - [ ] All three connectors show green in `hivekit doctor`.
 - [ ] A second routine run over unchanged sources makes **zero model calls** — asserted by counter, not by timing. Clearing `seen` in `MEMORY.md` forces a full re-run.
-- [ ] An operator correction recorded in `MEMORY.md` changes behaviour on the next run — the headline reason memory is worth having. Test: reject a draft for a stated reason, assert the next run's master prompt contains that correction and the output complies.
+- [ ] An operator correction changes behaviour on the next run — the headline reason memory is worth having. Test: reject a draft for a stated reason, assert it lands in **Pinned** immediately (no promotion wait), appears in the next run's master prompt, and the output complies.
+- [ ] Scope isolation: a Rule scoped to one source is **not** retrieved for a job about a different source.
 - [ ] A source page carrying an injection payload produces a flagged approval card and **zero tool escalations**; the acting model provably never sees the raw page text.
 - [ ] `exec.run` never goes through a shell: `; rm -rf /` passed as an argument is treated literally.
 - [ ] `x.post` / `email.send` cannot execute without an approval receipt even in `auto` mode.
