@@ -117,7 +117,7 @@ Done when the file exists and the timeline shows plan → workers → merge.
 - FR-A4. Workers report structured results: status, artifact paths, notes, blockers.
 - FR-A5. Master merges results and writes the final answer/artifact into the thread.
 - FR-A6. Worker results are checked **by code first** — schema, required fields, the task's `success` sentence — before any model judges them. On failure: (1) retry the same model with the *exact validator error* appended, (2) retry with a tighter spec and fewer inputs, (3) escalate to the role's fallback model, then surface a question card. Never silently drops. The specific error text is the point: a blind retry repeats the mistake.
-- FR-A7. Workers are capped at 8 tool calls and a wall clock. Calling the same tool with the same arguments twice returns "you already did that" instead of the result — small models loop, and this is cheaper than finding out via the bill.
+- FR-A7. Workers are capped at 8 tool calls and a wall clock. One identical retry (same tool, same arguments) is allowed silently — a transient timeout or 5xx warrants a second try. The third identical call returns "you already did that" instead of the result: small models loop past a single retry, and catching it in code is cheaper than finding out via the bill.
 - FR-A8. Operator can stop a job or reassign a single task to another model mid-flight.
 
 ### 7.3 Connectors

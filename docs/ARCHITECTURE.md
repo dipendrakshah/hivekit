@@ -93,10 +93,15 @@ Frame types (complete list):
 - `event.thread` (messages, cards, artifacts)
 - `event.job` (plan/task/worker state transitions)
 - `event.approve` (approval card needing a human)
+- `ping` / `pong` — server-initiated keepalive, **25 s** interval, matching `Bun.serve`'s
+  60 s idle timeout so the connection never goes quiet long enough to trip it. This is a
+  separate, tighter layer than a proxy's own idle timeout (Cloudflare's is documented at
+  ~100 s in `deploy/README.md`) — the 25 s ping keeps the socket alive under both. A client
+  that misses 2 consecutive pongs is presumed gone and closed server-side, so a half-dead
+  connection does not hold a thread's event stream hostage; the client reconnects and
+  resumes by cursor.
 
 Idempotency keys on `job.approve`, `job.cancel`, `routine.create`.
-
-**WS keepalive:** Bun.serve ping interval **25 s** (idle timeout 60 s); client reconnects on close.
 
 ### 4.2 Data model
 
@@ -137,9 +142,11 @@ Two loops, one codebase.
    no thread history, **no credentials** — connector secrets are dereferenced inside the tool
    executor, outside the model's view.
 2. Tool loop until `submit_result`, a cap of 8 tool calls, or timeout.
-3. Loop guard: the same tool called twice with the same arguments returns "you already did
-   that" instead of the result. Small models loop; catching it in code is cheaper than
-   catching it on the invoice.
+3. Loop guard: **one identical retry is allowed silently** — a transient timeout or 5xx
+   legitimately warrants trying the same call again. The *third* identical call (same tool,
+   same arguments) returns "you already did that" instead of the result. A guard that fires on
+   the first repeat blocks genuine retries; one that never fires is not a guard. Small models
+   loop past a single retry; catching it in code is cheaper than catching it on the invoice.
 4. Structured result posted to the job graph; worker session archived.
 
 Workers never see operator chat beyond their task spec. Masters write specs weak models can follow: explicit paths, explicit output format, explicit "do not" list.
@@ -167,6 +174,13 @@ worker seat at all.
 Capabilities come from the provider catalog where published and otherwise from a six-call
 probe (~2k tokens) run once per model and cached: echo, system-role adherence, tool call,
 JSON schema, long-input needle, instruction discipline.
+
+The cache is not indefinite. A provider silently swaps what a model id points to more often
+than its catalog entry changes. Two triggers re-probe: a **TTL** (`capability_probe_ttl_days`,
+default 14) on every cache entry, and **invalidate-on-mismatch** — a model cached as
+tool-capable that fails to produce a valid native tool call twice in a row has its entry
+dropped immediately and is re-probed on its next call, rather than limping along on a stale
+capability for two more weeks.
 
 The same logical request is then rendered per model:
 

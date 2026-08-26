@@ -54,6 +54,11 @@ memory:
   git: false                 # commit each write; enables `hivekit memory log|diff|revert`
   diff_in_thread: true       # post the memory diff into the thread. Leave this on.
 
+# How long a model's probed capabilities (tool calling, JSON mode, system role, …)
+# are trusted before re-probing. Also invalidated early if a cached-capable model
+# starts failing calls that capability should cover — see ARCHITECTURE §4.4.1.
+capability_probe_ttl_days: 14
+
 limits:
   max_workers_per_job: 8
   max_spawn_depth: 1                     # not configurable above 1

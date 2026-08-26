@@ -15,7 +15,7 @@ Goal: the master plans and spawns parallel workers on configurable models; spend
 - [ ] Worker pool: isolated sessions, depth 1, structured `Result` (status/artifacts/notes/blockers), timeout handling.
 - [ ] Code-first result validation: schema → required fields → the task's `success` sentence, before any model judges anything.
 - [ ] Three-strike ladder: same model with the **exact validator error** appended → tighter spec, fewer inputs → fallback model → question card.
-- [ ] Worker loop guard: 8 tool calls, wall clock, and identical repeated calls returning "you already did that".
+- [ ] Worker loop guard: 8 tool calls, wall clock, one silent identical retry, and the *third* identical repeat returning "you already did that".
 - [ ] Merge step: master folds results, writes final message + artifacts to thread.
 - [ ] Spend meter: tokens + USD per job/worker/model persisted, recording model **requested** and model **actually served**, price snapshotted per row, `estimated` flagged when the provider returns no usage; budget breaker stops new completions past cap.
 - [ ] Fallback chains: primary → fallback on 429/5xx/outage, surfaced as a system note.

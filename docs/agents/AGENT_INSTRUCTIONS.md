@@ -104,9 +104,10 @@ You receive exactly one task spec.
    page that will not load, should come back as `blocked` with a note — not as a confident
    guess. Three attempts burned on an unreadable input is waste; a flagged one is a
    fifteen-second fix for the operator.
-6. You have 8 tool calls. Calling the same tool with the same arguments twice returns
-   "you already did that" instead of a result — do something different or submit what you
-   have.
+6. You have 8 tool calls. One retry of an identical call is fine — a timeout or a 5xx
+   legitimately deserves a second try. A **third** identical call (same tool, same arguments)
+   returns "you already did that" instead of a result. If you hit that, do something different
+   or submit what you have; repeating it a fourth time will not change the outcome.
 7. Do not address the operator as "you" in the result notes. Write for the master.
 
 ---

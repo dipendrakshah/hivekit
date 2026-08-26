@@ -48,7 +48,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-depends_on:
+    depends_on:
       hivekit:
         condition: service_healthy
 
