@@ -1,107 +1,100 @@
 # Hivekit System Architecture
 
-Version: 0.1  
-Companion to [PRD.md](../PRD.md).  
-Reference systems: OpenClaw Gateway + workspace files; Grok-style orchestrator with parallel sub-agents.
+Version: 0.2
+Companion to [PRD.md](../PRD.md).
+Reference shape: Grok Bot (thread UX, parallel bots, inline approvals, routines) — minus the vendor cloud.
 
 ---
 
 ## 1. One-sentence architecture
 
-A single **Gateway** process holds sessions, model clients, the job graph, and tool execution. Thin **clients** attach over WebSocket. A **master agent** writes a plan; the Gateway **spawns workers** with their own context; workers write files and return structured results; the master merges.
+A single **Node process** serves the web app, speaks WSS to browsers, runs the agent loops, fires routine crons, and talks to connectors — all state in one SQLite file on one volume, deployable by `docker compose up` on any small VM.
 
 ```
- Operator
-    │
-    ├── Electron (macOS)  ─┐
-    ├── Android app       ─┼── WebSocket (JSON frames) ──► Gateway :8787
-    └── Cloud web app     ─┘                                    │
-                                                                │
-                    ┌───────────────────────────────────────────┼──────────────┐
-                    │ Gateway                                   │              │
-                    │  ┌─────────┐  ┌──────────┐  ┌──────────┐  │  ┌────────┐  │
-                    │  │ Router  │  │ Job graph│  │ Vault    │  │  │ Index  │  │
-                    │  └────┬────┘  └────┬─────┘  └────┬─────┘  │  └───┬────┘  │
-                    │       │            │             │        │      │       │
-                    │  ┌────▼────────────▼─────────────▼────────▼──────▼────┐  │
-                    │  │              Agent runtime                         │  │
-                    │  │   Master loop  ◄── plan / merge / ask human        │  │
-                    │  │   Worker pool  ◄── isolated sessions, depth = 1    │  │
-                    │  └──────────────┬─────────────────────┬───────────────┘  │
-                    │                 │                     │                  │
-                    │          Model adapter          Tool bus                 │
-                    │          (OpenAI-compat)        (fs, fetch, pdf, exec)   │
-                    └─────────────────┼─────────────────────┼──────────────────┘
-                                      │                     │
-                         OpenRouter / Anthropic /     Workspace on disk
-                         Ollama / custom base URL     ~/.hivekit/workspace
+ Operator (desktop or phone browser)
+        │  HTTPS / WSS   (Caddy auto-TLS, or Cloudflare DNS/Tunnel in front)
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│ Hivekit container (EC2 / Hetzner / Fly / Railway VM)    │
+│                                                         │
+│  ┌────────────┐  ┌──────────────┐  ┌─────────────────┐  │
+│  │ HTTP + WSS │  │ Agent runtime│  │ Scheduler       │  │
+│  │ static UI  │  │ master loop  │  │ routines (cron) │  │
+│  │ sessions   │  │ worker pool  │  │ catch-up runner │  │
+│  └─────┬──────┘  └──────┬───────┘  └────────┬────────┘  │
+│        │                │                   │           │
+│  ┌─────▼────────────────▼───────────────────▼────────┐  │
+│  │ SQLite (WAL): threads, jobs, routines, receipts,  │  │
+│  │ spend log, settings, vault (AES-GCM encrypted)    │  │
+│  └─────┬────────────────┬───────────────────┬────────┘  │
+│        │                │                   │           │
+│   Model adapter      Tool bus          Connectors       │
+│   (OpenAI-compat,    (fetch, fs under  site(git) · x    │
+│    anthropic)         data dir)         (X API) · email  │
+└────────┼────────────────┼───────────────────┼───────────┘
+         ▼                ▼                   ▼
+  OpenRouter / Anthropic /   Web, RSS     git remote · X API ·
+  Groq / Ollama / custom                  IMAP / SMTP
 ```
 
-## 2. Design differences from OpenClaw
+## 2. What was deleted from the v0.1 design (and why)
 
-OpenClaw is the right *shape* (Gateway, workspace markdown, skills as `SKILL.md`, isolated agent sessions, spawn + announce back). Hivekit deletes most of the surface area:
+The earlier design pack carried OpenClaw-flavored weight. v0.2 keeps the Grok-Bot shape and deletes:
 
-| OpenClaw | Hivekit v1 |
+| Removed | Replacement |
 | --- | --- |
-| Channels: WhatsApp, Telegram, Slack, Discord, Signal, iMessage, … | Only Hivekit clients |
-| Nodes with camera / location / canvas | No device nodes. Android is a client, not a sensor node |
-| Plugin marketplace (ClawHub) | A `skills/` folder in the repo |
-| Multi-agent *routing* across identities | One operator, many *workers* inside a job |
-| Heartbeat + dreaming + presence | Heartbeat cron only |
-| Depth-configurable sub-agents | Hard cap: depth 1, max 16 children |
+| Electron macOS app + Android app + cloud web (three surfaces) | One responsive web app served by the Gateway itself |
+| Six workspace persona files (`SOUL.md`, `IDENTITY.md`, …) | Bot instructions field in Settings (stored in DB), seeded with a good default |
+| Skills folders + marketplace ideas | Routines + per-thread instructions |
+| Heartbeat file | Cron scheduler in-process |
+| Keychain/age vault per device | Server-side AES-GCM column in SQLite; key from env `HIVEKIT_MASTER_KEY` |
 
-We keep the part that matters: **markdown workspace as memory**, **spawn isolated children**, **announce results to parent**.
+## 3. Deploy shapes
 
-## 3. Processes and deploy shapes
+1. **VM + Compose (recommended).** EC2 Lightsail / t4g.nano, Hetzner CX22, DO droplet. Compose stack: Caddy (TLS) + hivekit + volume.
+2. **Fly.io / Railway.** One service + attached volume; their TLS terminates WSS fine.
+3. **Cloudflare.** No general-purpose VM exists there; the supported pattern is Cloudflare DNS proxy or Tunnel in front of a VM running Hivekit. Workers cannot host long-lived WebSocket gateways.
 
-Three legal deploy shapes. Same binary.
+Sizing: 1 vCPU / 1 GB RAM is enough for ≤ 8 concurrent workers because workers are I/O-bound API calls, not local inference.
 
-1. **Laptop.** Gateway + Electron on one Mac. Workspace is a local folder. Default for development.
-2. **Always-on box.** Gateway on a small VPS or home server. Electron and Android talk to it over Tailscale / SSH tunnel / HTTPS. Workspace lives on the box.
-3. **Cloud workshop.** Gateway + web UI in Docker Compose (Caddy + Gateway + optional Ollama). Operator logs into the web app. Files persist on a volume.
-
-Android never runs the Gateway in v1.
-
-## 4. Gateway internals
+## 4. Process internals
 
 ### 4.1 Control plane
 
-WebSocket on `127.0.0.1:8787` by default. Remote bind is off until the operator sets `gateway.expose` and a token.
+One port (default `8787`). Static UI at `/`, JSON frames over WS at `/ws`.
 
-Frame types (deliberately smaller than OpenClaw):
+Frame types (complete list):
 
-- `req.hello` → snapshot (health, models, active jobs)
-- `req.chat` → user message into a session
-- `req.job.start` / `req.job.cancel` / `req.job.approve`
-- `req.models.set` (master / worker / reviewer)
-- `req.fs.list` / `req.fs.read` (workspace only)
-- `event.job` (graph updates)
-- `event.agent` (token stream)
-- `event.approve` (human-in-the-loop)
+- `req.hello` → snapshot (threads, routines, active jobs, models)
+- `req.chat.send` → operator message into a thread
+- `req.job.approve` / `req.job.deny` / `req.job.cancel`
+- `req.routine.create` / `.pause` / `.resume` / `.edit`
+- `req.models.set` (master / worker / reviewer, hot reload)
+- `req.connector.set` credentials (writes to vault; never echoed back)
+- `event.thread` (messages, cards, artifacts)
+- `event.job` (plan/task/worker state transitions)
+- `event.approve` (approval card needing a human)
 
-Idempotency keys on `job.start`, `job.approve`, `job.cancel`.
+Idempotency keys on `job.approve`, `job.cancel`, `routine.create`.
 
-### 4.2 Job graph
-
-A job is a directed acyclic graph stored in SQLite.
+### 4.2 Data model
 
 ```
-Job
-  id, title, skill, workspace, status
-  master_model, worker_model
-  budget_tokens, budget_usd
-  created_at, finished_at
-
-Task
-  id, job_id, parent_task_id (null for roots)
-  title, spec_json, status
-  assignee (master | worker | reviewer | human)
-  model_id
-  artifact_paths_json
-  error
+Thread      id, title, created_at
+Message     id, thread_id, role(op|master|worker|system), body, card_json, artifact_refs
+Job         id, thread_id, title, status, master_model, worker_model,
+            budget_usd, tokens_in/out, usd, created_at, finished_at
+Task        id, job_id, idx, title, spec_json, status, model_id, artifacts_json, error
+Routine     id, name, cron, prompt_template, connector_scope, notify_policy,
+            enabled, last_run_at, next_run_at
+Approval    id, job_id, action_kind(site_push|x_post|email_send|exec|delete),
+            payload_json, receipt(status, decided_by, decided_at, model, diff_ref)
+Setting     key, value            # models, policy, connector configs
+Vault       ref, ciphertext       # provider + connector secrets
 ```
 
-States: `queued → running → needs_approval → merging → done | failed | cancelled`.
+Job states: `planning → running → needs_approval → merging → done | failed | cancelled`.
+Crash safety: every transition persists before side effects; boot re-enqueues running tasks and marks interrupted approvals back to `needs_approval`.
 
 ### 4.3 Agent runtime
 
@@ -109,192 +102,89 @@ Two loops, one codebase.
 
 **Master loop**
 
-1. Load `SOUL.md` + `AGENTS.md` + `USER.md` + matched `SKILL.md` + workspace index snippet.
-2. Ask master model for a `Plan` object (JSON schema).
-3. Validate plan (task count ≤ 16, no nested spawn, artifacts named).
-4. Enqueue tasks.
-5. On each worker `Result`, fold into a running synthesis.
-6. When all tasks terminal, ask master for `Merge` (or skip if single task).
-7. Write `jobs/<id>/REPORT.md` and promote artifacts.
+1. Load thread context + bot instructions + matched connector notes + recent artifact index.
+2. Ask the master model for a `Plan` (JSON schema): tasks ≤ 8, each with inputs, expected artifact, success sentence.
+3. Spawn workers. Fold each structured `Result` into a synthesis.
+4. When tasks settle, ask for `Merge` → final message + artifacts in-thread.
+5. On failure: retry that task once with a tighter spec; then post a question card instead of guessing.
 
 **Worker loop**
 
-1. Fresh session. System prompt = worker slice of AGENT_INSTRUCTIONS + task spec + only the files listed in the spec.
+1. Fresh isolated session: task spec + only referenced inputs. No other workers' transcripts.
 2. Tool loop until `submit_result` or timeout.
-3. Gateway posts `Result` onto the job graph. Master is woken. Worker session is archived.
+3. Structured result posted to the job graph; worker session archived.
 
-Workers do not see other workers' transcripts. That is the Grok-Build lesson: isolated context beats a shared soup.
+Workers never see operator chat beyond their task spec. Masters write specs weak models can follow: explicit paths, explicit output format, explicit "do not" list.
 
 ### 4.4 Model adapter
 
-One interface:
-
 ```
-complete({
-  model,
-  messages,
-  tools,
-  json_schema?,
-  timeout_ms,
-  max_tokens
-}) -> stream | object
+complete({ model, messages, tools, json_schema?, timeout_ms, max_tokens })
+  -> stream | object
 ```
 
-Adapters:
+Adapters: `openai_compat` (OpenRouter, Groq, Together, Fireworks, Ollama, LM Studio, custom base URL) and `anthropic`. Google optional later.
 
-- `openai_compat` (OpenRouter, Groq, Together, Ollama, LM Studio, custom)
-- `anthropic` (native messages + tools)
-- `google` (optional in v1.1)
-
-OpenRouter is the blessed path because one key unlocks Claude Fable, Ox Alpha (`stealth/ox-alpha`), Llama/Muse-class Meta models, and dozens of free or cheap workers.
-
-Catalog cache: on boot, if the provider exposes `/models`, Hivekit stores id, context length, modality, price. The UI picker reads the cache. Unknown ids are still allowed — the operator may type a raw slug.
+Catalog cache: on first use of a provider exposing `/models`, store id/context/price/modality; the Settings picker reads it; raw slugs always allowed. Hot swap: changing `models.worker` affects only newly spawned workers.
 
 ### 4.5 Tool bus
 
-Tools are functions with JSON schemas. Policy sits in front of the bus.
-
 | Tool | Default policy (`ask` mode) |
 | --- | --- |
-| `fs.read` `fs.list` `fs.search` | allow in workspace |
-| `fs.write` `fs.edit` | allow under `jobs/` and `out/`; ask elsewhere |
-| `web.fetch` | allow, content marked untrusted |
-| `pdf.extract` `office.extract` | allow |
-| `exec.run` | ask, unless command is in `tools.exec_allowlist` |
-| `git.commit` | ask |
-| `git.push` | always ask |
-| `job.submit_result` | workers only |
-| `job.spawn_worker` | master only, depth check |
+| `web.fetch` / `rss.read` | allow; content wrapped untrusted |
+| `fs.read/write/edit` (under data dir only) | allow under `jobs/`, ask elsewhere |
+| `site.commit` (local branch) | allow |
+| `site.push` | **always ask**, diff preview attached |
+| `x.draft` | allow |
+| `x.post` | **always ask** |
+| `email.fetch` (IMAP) | allow |
+| `email.send` (SMTP) | **always ask** |
+| `exec.run` | ask unless allowlisted |
 
-No dynamic tool creator in v1.
+Every "always ask" action writes an `Approval` receipt — action, diff/payload, deciding human, model used. Receipts are browsable; this is Hivekit's audit answer to the trust gap flagged in Grok Bot coverage.
 
-### 4.6 Vault
+### 4.6 Scheduler
 
-- macOS: Keychain via Electron helper or `security` CLI.
-- Linux / VPS: age-encrypted file `~/.hivekit/vault.age` or `HIVEKIT_MASTER_KEY`.
-- Web cloud: same vault on the server. Browser never receives raw provider keys.
+In-process cron (node-cron semantics persisted in SQLite so reboot-safe). Routines are authored in natural language: the master model converts the request into `{cron, prompt_template, connectors, notify}`, shown back as a confirm card before anything persists. Each tick enqueues a synthetic operator message ("[routine] morning-site-update fired") into the routine's thread; missed ticks while down run once on boot, flagged late. Notify policies: `always`, `on-approval-only` (default), `silent-until-done`; outbound pings use email digest via the operator's SMTP.
 
-Clients send `vault.set(provider, key)` over the WS after local pairing. The Gateway writes the vault. Logs print `sk-***`.
+### 4.7 Vault & auth
 
-## 5. Workspace layout
+- First login sets an owner passkey; sessions are signed cookies; single-operator.
+- Secrets (provider keys, X keys, IMAP app password) stored AES-256-GCM, key from `HIVEKIT_MASTER_KEY` env; never sent to clients after save; redacted (`sk-***`) in all logs.
+- Stealth/free models show a persistent banner when routed sensitive scopes (e.g., email).
 
-Default: `~/.hivekit/workspace` (override in YAML).
-
-```
-workspace/
-  AGENTS.md          # how this hive behaves
-  SOUL.md            # tone and boundaries
-  USER.md            # who the operator is
-  IDENTITY.md        # name, avatar, pronouns for the hive
-  TOOLS.md           # local notes on what is wired
-  HEARTBEAT.md       # recurring jobs
-  inbox/             # drop files here
-  jobs/<id>/         # scratch + worker outputs
-  out/               # promoted artifacts
-  memory/YYYY-MM-DD.md
-  skills/            # optional private skills
-```
-
-Prompt assembly budget (starting point, tunables in YAML):
-
-| Layer | Budget |
-| --- | --- |
-| SOUL + IDENTITY | 800 tokens |
-| AGENTS + TOOLS | 600 tokens |
-| USER | 400 tokens |
-| Matched skill | 800 tokens |
-| Memory search | 1200 tokens |
-| Workspace index | 800 tokens |
-| Task spec / chat | remainder |
-
-External documents go in as extracted text wrapped in `<untrusted>` tags.
-
-## 6. Skills
-
-A skill is a folder:
+## 5. Repository layout
 
 ```
-skills/tax-dashboard/
-  SKILL.md          # when to use, procedure, output contract
-  schema.json       # optional JSON schema for the final artifact
+apps/gateway        # Node daemon: HTTP+WSS, agents, scheduler, serves apps/web build
+apps/web            # responsive UI (Preact/React), desktop + mobile layouts
+packages/protocol   # frame + schema types (zod)
+packages/models     # adapters + catalog cache
+packages/tools      # tool bus + policies
+packages/connectors # site(git) · x(X API) · email(IMAP/SMTP)
+deploy/             # docker-compose.yml, Caddyfile, EC2/Fly guides
 ```
 
-Matching: master sees a one-line catalog (name + trigger). Full body loads only on match — same idea as OpenClaw / Claude skills.
+SQLite via `better-sqlite3`, WAL mode. Backups = copy the volume.
 
-v1 ships three reference skills: `news-site`, `tax-dashboard`, `file-workshop`.
+## 6. Security model summary
 
-## 7. Clients
+1. Owner passkey → session cookie → WSS auth. No multi-tenant anything.
+2. Tools refuse paths outside the data dir. No dynamic tool creation.
+3. External sends (push/tweet/email) are structurally unable to bypass approval cards.
+4. Untrusted content is wrapped; instructions inside it are never followed.
+5. Budget circuit breaker stops new completions past `limits.budget_usd_per_job`.
+6. Every irreversible action leaves a receipt.
 
-### 7.1 Shared UI kit
+## 7. Setup, in practice
 
-One React (or Preact) app in `apps/web`. Electron loads it from disk. Cloud serves it. Android v1 is a Kotlin shell with a WebView for chat + a native job list and approval sheet so push and biometric approve feel native.
-
-### 7.2 Electron macOS
-
-- Traffic-light window, sidebar, optional native menu.
-- File drop onto `inbox/`.
-- Keychain integration.
-- Local preview of `out/**/*.html`.
-
-### 7.3 Android
-
-- Connects to a reachable Gateway (Tailscale recommended).
-- Push via FCM for `needs_approval` and `job.done`.
-- Artifact preview: Markdown, HTML, images, CSV tables.
-
-### 7.4 Cloud web
-
-- Same UI as Electron.
-- Auth: single operator passkey + recovery code.
-- No multi-tenant in v1. One compose stack = one operator.
-
-Mock screens: [docs/ui](ui/README.md).
-
-## 8. Security model
-
-1. Pairing: first client to a fresh Gateway becomes owner. Later clients need the owner token.
-2. Workspace is not a hard sandbox, but tools refuse paths outside it.
-3. `exec.run` is a separate permission bit.
-4. Provider keys never round-trip back to clients after write.
-5. Anonymous / stealth models get a red banner: "provider retains prompts." Tax skill defaults to blocking those providers unless the operator flips `skills.tax-dashboard.allow_stealth: true`.
-6. Budget circuit breaker kills new completions when the job exceeds `budget_usd`.
-
-## 9. Observability
-
-- Structured logs: job_id, task_id, model, tokens_in, tokens_out, usd, latency_ms.
-- `hivekit doctor` checks: node version, vault, provider ping, workspace writable, disk.
-- Each job writes `jobs/<id>/trace.jsonl`.
-
-## 10. Implementation slice (suggested)
-
-Monorepo, TypeScript, Node 22+:
-
-```
-apps/gateway        # the daemon
-apps/web            # UI
-apps/electron       # thin wrapper
-apps/android        # Kotlin shell
-packages/protocol   # frame types
-packages/models     # adapters
-packages/tools      # tool bus
-packages/workspace  # markdown + index
+```sh
+git clone && cp .env.example .env   # HIVEKIT_TOKEN, HIVEKIT_MASTER_KEY, PUBLIC_URL
+docker compose up -d                # Caddy + hivekit + volume
+open https://hive.example.com       # set passkey → paste key → message the hive
+hivekit doctor                      # container exec: config, vault, provider ping, disk
 ```
 
-SQLite via `better-sqlite3` or `libsql`. No second database in v1.
+## 8. Evolution valve
 
-## 11. What "simple setup" means in practice
-
-```
-curl -fsSL https://hivekit.dev/install.sh | sh     # later
-hivekit init
-# editor opens config/hivekit.yaml
-hivekit doctor
-hivekit gateway
-# open http://127.0.0.1:8787
-```
-
-Until the installer exists, Docker Compose in `deploy/` is the supported path.
-
-## 12. Evolution valve
-
-If Hivekit ever needs WhatsApp, it should grow an OpenClaw-compatible channel plugin — not invent a second Baileys stack. The protocol and workspace files are already close enough that a future bridge is plausible. Do not build it in v1.
+A fourth connector (LinkedIn, Telegram listener, etc.) must arrive as a new module in `packages/connectors` with its own approval kinds — not as core changes. If multi-user ever matters, fork into a v2 PRD; do not grow IAM quietly.

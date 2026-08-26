@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Hivekit — app mock</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #12110e; --panel: #1c1a16; --line: #2e2a24;
+      --text: #ece8df; --mute: #9a9286; --copper: #d4783a; --sage: #7a9e7e;
+      --danger: #c45c4a; --warn: #c9a227;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0b0a08; font: 14px/1.45 "IBM Plex Sans", sans-serif; color: var(--text); }
+    .intro { max-width: 1180px; margin: 0 auto; padding: 26px 20px 4px; }
+    .intro h1 { font-size: 20px; font-weight: 500; margin: 0 0 4px; }
+    .intro p { color: var(--mute); margin: 0; font-size: 13px; }
+    .row { display: flex; flex-wrap: wrap; gap: 36px; justify-content: center; align-items: flex-start; padding: 22px 16px 56px; }
+    .caption { color: var(--mute); font-size: 12px; margin: 0 0 10px; font-family: "IBM Plex Mono", monospace; }
+
+    .desk {
+      width: min(980px, 96vw); height: 700px;
+      background: var(--bg); border: 1px solid #3a342c; border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 40px 80px #0008;
+    }
+    .topbar { height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: #191714; border-bottom: 1px solid var(--line); }
+    .brand { font-weight: 600; letter-spacing: .04em; }
+    .brand span { color: var(--copper); }
+    .badge { font-size: 10px; font-family: "IBM Plex Mono", monospace; background: #2a2110; color: #e4c27a; border-radius: 99px; padding: 2px 8px; }
+    .conn { margin-left: auto; display: flex; align-items: center; gap: 7px; color: var(--mute); font-size: 12px; }
+    .dotlive { width: 7px; height: 7px; background: var(--sage); border-radius: 50%; }
+    .shell { display: grid; grid-template-columns: 190px 1fr 250px; flex: 1; min-height: 0; }
+
+    nav { border-right: 1px solid var(--line); background: #16140f; padding: 12px 10px; display: flex; flex-direction: column; gap: 3px; }
+    nav h3 { margin: 14px 8px 5px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
+    nav h3:first-child { margin-top: 2px; }
+    .item { padding: 7px 8px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; color: var(--text); }
+    .item.active { background: #2a231c; color: var(--copper); }
+    .item span.k { color: var(--mute); font-size: 11px; font-family: "IBM Plex Mono", monospace; }
+    .item .dotn { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+
+    .threadwrap { display: flex; flex-direction: column; min-width: 0; }
+    .status { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--mute); padding: 8px 16px; border-bottom: 1px solid var(--line); }
+    .thread { flex: 1; overflow: auto; padding: 18px 22px; }
+    .who { font-size: 11px; color: var(--mute); margin-bottom: 4px; font-family: "IBM Plex Mono", monospace; }
+    .bubble { max-width: 580px; margin-bottom: 14px; }
+    .bubble.op { margin-left: auto; }
+    .body { background: var(--panel); border: 1px solid var(--line); padding: 10px 12px; border-radius: 10px; }
+    .bubble.op .body { background: #2a241c; border-color: #3d3428; }
+    .plan { border: 1px solid #3d3428; background: #1a1713; border-radius: 10px; padding: 12px; margin-top: 8px; }
+    .plan h4 { margin: 0 0 8px; font-size: 13px; font-weight: 500; }
+    .task { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-top: 1px solid #2a261f; font-size: 13px; }
+    .pill { font-size: 10px; padding: 1px 7px; border-radius: 99px; font-family: "IBM Plex Mono", monospace; white-space: nowrap; }
+    .ok   { background: #1d2a1e; color: var(--sage); }
+    .run  { background: #2a2314; color: var(--copper); }
+    .wait { background: #2a2118; color: var(--warn); }
+
+    .approve { border: 1px solid #6b5636; background: #201b12; border-radius: 10px; padding: 12px; margin-bottom: 14px; max-width: 580px; }
+    .approve h4 { margin: 0 0 6px; font-size: 13px; color: #e4c27a; font-weight: 500; }
+    .diff { background: #14120e; border: 1px solid #2e2a24; border-radius: 8px; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; padding: 8px 10px; margin: 8px 0; white-space: pre; overflow-x: auto; }
+    .diff .add { color: var(--sage); } .diff .del { color: var(--danger); }
+    .btnrow { display: flex; gap: 8px; margin-top: 10px; }
+    .btn { background: var(--copper); color: #1a110a; border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+    .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+    .btn.danger { background: transparent; color: var(--danger); border: 1px solid #4a332c; }
+
+    .composer { border-top: 1px solid var(--line); padding: 12px 16px; display: flex; gap: 8px; background: #16140f; }
+    .composer input { flex: 1; background: #0f0e0c; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 10px 12px; }
+
+    aside { border-left: 1px solid var(--line); background: #16140f; padding: 14px; overflow: auto; }
+    aside h3 { margin: 0 0 10px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+    aside h3:not(:first-child) { margin-top: 18px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 8px; font-size: 12.5px; }
+    .card .sub { color: var(--mute); font-size: 11px; margin-top: 3px; font-family: "IBM Plex Mono", monospace; }
+    .mono { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--mute); }
+    .mono b { color: var(--text); font-weight: 500; }
+
+    /* ---------- phone frame ---------- */
+    .phone {
+      width: 330px; height: 700px; background: var(--bg); border: 8px solid #1a1814;
+      border-radius: 32px; overflow: hidden; display: flex; flex-direction: column;
+      box-shadow: 0 30px 60px #0007;
+    }
+    .notch { height: 24px; display: flex; align-items: center; justify-content: center; color: var(--mute); font-size: 11px; }
+    .appbar { padding: 2px 16px 10px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); }
+    .appbar h2 { font-size: 15px; margin: 0; font-weight: 500; }
+    .appbar small { color: var(--mute); font-family: "IBM Plex Mono", monospace; font-size: 10px; }
+    .mthread { flex: 1; overflow: auto; padding: 12px 12px 8px; }
+    .mtab { display: flex; border-top: 1px solid var(--line); background: #16140f; }
+    .mtab div { flex: 1; text-align: center; padding: 9px 0 13px; font-size: 11px; color: var(--mute); }
+    .mtab div.on { color: var(--copper); }
+  </style>
+</head>
+<body>
+  <div class="intro">
+    <h1>Hivekit — one responsive app</h1>
+    <p>Same thread on desktop and phone, like messaging a teammate. Plans, worker updates, approval cards, and artifacts live inline. Left: desktop · right: phone.</p>
+  </div>
+  <div class="row">
+
+    <!-- ============ DESKTOP ============ -->
+    <div>
+      <p class="caption">Desktop browser · thread + status rail</p>
+      <div class="desk">
+        <div class="topbar">
+          <div class="brand">HIVE<span>KIT</span></div>
+          <div class="badge">early build</div>
+          <div class="conn"><span class="dotlive"></span> hive.example.com · EC2 t4g.nano</div>
+        </div>
+        <div class="shell">
+          <nav>
+            <h3>Threads</h3>
+            <div class="item active">Site updates <span class="dotn"></span></div>
+            <div class="item">Tweets</div>
+            <div class="item">Inbox</div>
+            <div class="item">Scratch</div>
+            <h3>Work</h3>
+            <div class="item">Routines <span class="k">3</span></div>
+            <div class="item">Jobs</div>
+            <h3>System</h3>
+            <div class="item">Models</div>
+            <div class="item">Connectors</div>
+            <div class="item">Receipts</div>
+            <div class="item">Settings</div>
+          </nav>
+          <div class="threadwrap">
+            <div class="status"><span class="dotlive"></span> routine morning-site-update · job job_21a · 4 workers</div>
+            <div class="thread">
+              <div class="bubble op">
+                <div class="who">ROUTINE · daily 07:00 IST</div>
+                <div class="body">Morning sweep: five sources scanned, 2 items worth posting to the site.</div>
+              </div>
+              <div class="bubble">
+                <div class="who">MASTER · anthropic/claude-sonnet</div>
+                <div class="body">Two stories pass the bar. Drafted an update post + sidebar blurb; workers cross-checked claims against source pages.</div>
+                <div class="plan">
+                  <h4>Plan · site update · $0.03 spent</h4>
+                  <div class="task"><span class="pill ok">t1 ok</span> Scan 5 RSS sources → candidates.md</div>
+                  <div class="task"><span class="pill ok">t2 ok</span> Fact-check top 2 · quotes + dates</div>
+                  <div class="task"><span class="pill ok">t3 ok</span> Draft post in site voice</div>
+                  <div class="task"><span class="pill run">t4 run</span> Commit branch routine/aug-26</div>
+                </div>
+              </div>
+              <div class="bubble">
+                <div class="who">WORKER t2 · stealth/ox-alpha</div>
+                <div class="body">Both claims verified against primary pages. One quote trimmed to exact wording.</div>
+              </div>
+              <div class="approve">
+                <h4>Approval needed · site.push → main</h4>
+                <div style="font-size:12.5px">Adds <code>posts/hive-roundup-0826.html</code>, edits <code>index.html</code>. Repo: github.com/you/mysite</div>
+                <div class="diff"><span class="add">+ &lt;article class="card"&gt; Hive roundup — Aug 26 …</span>
+<span class="del">- &lt;!-- sidebar: last updated Aug 25 --&gt;</span></div>
+                <div class="btnrow">
+                  <button class="btn">Approve &amp; push</button>
+                  <button class="btn ghost">Edit draft</button>
+                  <button class="btn danger">Deny</button>
+                </div>
+              </div>
+            </div>
+            <div class="composer">
+              <input value="Push it, then draft two tweets about the post." />
+              <button class="btn">Send</button>
+            </div>
+          </div>
+          <aside>
+            <h3>This job</h3>
+            <div class="mono">master <b>claude-sonnet</b></div>
+            <div class="mono">workers <b>ox-alpha ×4</b></div>
+            <div class="mono">spend <b>$0.03</b> / $2.00 cap</div>
+            <h3>Routines</h3>
+            <div class="card"><strong>morning-site-update</strong><div class="sub">daily 07:00 · next 06:59</div></div>
+            <div class="card"><strong>tweet-digest</strong><div class="sub">weekly Mon 09:00 · paused</div></div>
+            <div class="card"><strong>inbox-sweep</strong><div class="sub">hourly · ping on urgent</div></div>
+            <h3>Connectors</h3>
+            <div class="mono">site <b>github.com/you/mysite</b></div>
+            <div class="mono">x <b>@you · drafts only</b></div>
+            <div class="mono">email <b>imap · 2 unread</b></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PHONE ============ -->
+    <div>
+      <p class="caption">Phone browser · same thread, approve from anywhere</p>
+      <div class="phone">
+        <div class="notch">07:04</div>
+        <div class="appbar"><h2>HIVEKIT</h2><small>site updates · 1 needs you</small></div>
+        <div class="mthread">
+          <div class="bubble op" style="max-width:none">
+            <div class="who" style="margin-bottom:2px">ROUTINE · daily 07:00</div>
+            <div class="body" style="border-radius:12px">Morning sweep done. 2 items worth posting. Diff is ready for your review.</div>
+          </div>
+          <div class="approve" style="margin-top:12px;max-width:none">
+            <h4>Approval needed · site.push → main</h4>
+            <div style="font-size:12.5px">1 new post + index edit</div>
+            <div class="diff"><span class="add">+ posts/hive-roundup-0826.html</span></div>
+            <div class="btnrow">
+              <button class="btn" style="flex:1">Approve</button>
+              <button class="btn ghost">Edit</button>
+              <button class="btn danger">Deny</button>
+            </div>
+          </div>
+          <div class="bubble" style="max-width:none">
+            <div class="who" style="margin-bottom:2px">MASTER</div>
+            <div class="body" style="border-radius:12px">Pushed as <code>a91f2c3</code>. Want tweets now or after lunch?</div>
+          </div>
+        </div>
+        <div class="composer" style="padding:10px 12px">
+          <input placeholder="Message the hive" style="padding:10px" />
+        </div>
+        <div class="mtab"><div class="on">Threads</div><div>Routines</div><div>Jobs</div><div>You</div></div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

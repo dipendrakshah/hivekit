@@ -1,60 +1,69 @@
-# Copy to ~/.hivekit/hivekit.yaml
-# Keys do not live here. Use `hivekit vault set openrouter` (or the UI).
+# Copy to deploy/.env / compose env. Keys do not live here —
+# set them once in Settings → Models/Connectors (stored encrypted in SQLite).
 
-gateway:
-  bind: 127.0.0.1
+server:
   port: 8787
-  expose: false          # true only behind Tailscale / TLS
-  token_env: HIVEKIT_TOKEN
+  public_url: https://hive.example.com   # Caddy or Cloudflare terminates TLS in front
 
-workspace: ~/.hivekit/workspace
+auth:
+  token_env: HIVEKIT_TOKEN               # bootstrap owner token; passkey set on first login
+  vault_key_env: HIVEKIT_MASTER_KEY      # AES key for the server-side secrets vault
 
-roles:
+# Master plans, workers execute. Both are hot-swappable at runtime.
+models:
   master:
     provider: openrouter
     model: anthropic/claude-sonnet-4.6
-    # Example upgrade: anthropic/claude-fable-5
     fallback: openai/gpt-4.1-mini
     temperature: 0.2
     max_tokens: 8192
   worker:
     provider: openrouter
-    model: stealth/ox-alpha          # free/stealth worker; also written 0xAlpha
+    model: stealth/ox-alpha              # free/stealth worker
     fallback: meta-llama/llama-4-maverick
-    # Example Meta "Muse-class" / Llama route lives here when the slug is known
     temperature: 0.3
     max_tokens: 8192
-  reviewer:
+  reviewer:                              # optional, deferred to v1.1 by default
     enabled: false
-    provider: openrouter
-    model: openai/gpt-4.1-mini
 
 limits:
   max_workers_per_job: 8
-  max_spawn_depth: 1
   job_timeout_minutes: 45
   budget_usd_per_job: 2.00
 
 policy:
-  mode: ask                 # ask | auto | strict
+  mode: ask                              # ask | auto | strict
   exec_allowlist:
     - "git status"
     - "git diff"
-    - "npm test"
-  stealth_models_blocked_skills:
-    - tax-dashboard
+  # Sensitive scopes refuse stealth providers unless allowed here:
+  stealth_allowed_scopes: []             # e.g. [x] but never [email] by default
 
 providers:
   openrouter:
     base_url: https://openrouter.ai/api/v1
-    vault_ref: openrouter
   anthropic:
     base_url: https://api.anthropic.com
-    vault_ref: anthropic
   ollama:
     base_url: http://127.0.0.1:11434/v1
-    vault_ref: none
 
-heartbeat:
-  enabled: true
-  file: HEARTBEAT.md
+# Connector credentials (X keys, IMAP app password) go in via the UI → vault.
+connectors:
+  site:
+    repo: git@github.com:you/mysite.git
+    branch: main
+    method: git                          # draft-only works with read access too
+  x:
+    handle: "@you"
+  email:
+    imap_host: imap.gmail.com
+    smtp_host: smtp.gmail.com            # sends always require approval
+    folders: [INBOX]
+
+# Routines are normally created from chat ("every morning at 07:00 …")
+# and stored in SQLite. Seed a few declaratively if you prefer:
+routines_seed:
+  - name: morning-site-update
+    cron: "0 7 * * * Asia/Kolkata"
+    prompt: "Run the morning site sweep: scan sources, draft update, prep push for approval."
+    notify: on-approval-only

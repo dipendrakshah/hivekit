@@ -1,14 +1,20 @@
-# Hivekit UI mocks
+# Hivekit UI mock
 
-Open these files in any browser. They are static and self-contained — no build step.
+One responsive web app served by the Gateway itself — desktop and phone are the same app, the way you message a teammate. Open [app.html](app.html) in any browser; it is static and self-contained.
 
-| File | Surface | What it shows |
-| --- | --- | --- |
-| [electron-macos.html](electron-macos.html) | Desktop workshop | Sidebar, chat + swarm, workspace, model roles |
-| [android.html](android.html) | Phone companion | Connect, chat, jobs, approval sheet |
-| [web-cloud.html](web-cloud.html) | Operator-hosted cloud | Dashboard, jobs table, keys (BYOK), deploy strip |
+| Frame | What it shows |
+| --- | --- |
+| Desktop | Thread with plan card, worker update, inline approval card (diff + approve/edit/deny), status rail with routines/connectors/spend |
+| Phone | Same thread, bottom tabs, approval card sized for a thumb |
 
-Design tokens (implement these in `apps/web`):
+## Patterns borrowed from Grok Bot (x.ai/bot)
+
+- **Thread is the interface** — tasks, plans, approvals, artifacts all arrive as messages. No separate jobs console for daily use.
+- **Inline approval cards** — irreversible actions come back in-thread with diff/payload preview, never a settings-style modal.
+- **Routines from conversation** — recurring jobs appear as first-class cards ("daily 07:00 · next 06:59") manageable without leaving the thread.
+- **Notify policies** — ping only when approval is needed by default; escalate to `always` per routine.
+
+## Design tokens (implement these in `apps/web`)
 
 - Background `#12110e`
 - Panel `#1c1a16`
@@ -18,7 +24,8 @@ Design tokens (implement these in `apps/web`):
 - Copper `#d4783a`
 - Sage `#7a9e7e`
 - Danger `#c45c4a`
+- Warn `#c9a227`
 - Font UI: `"IBM Plex Sans"`
 - Font mono: `"IBM Plex Mono"`
 
-Do not replace this with a generic purple-on-navy AI dashboard. The product is a workshop, not a chatbot landing page.
+Do not replace this with a generic purple-on-navy AI dashboard. The product is a workshop thread, not a chatbot landing page.

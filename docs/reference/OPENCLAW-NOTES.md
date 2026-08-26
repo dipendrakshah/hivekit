@@ -1,5 +1,7 @@
 # Notes from OpenClaw (Clawd) and Grok-style agents
 
+> **Archived reference (v0.1 era).** The v0.2 PRD pivoted to a self-hosted Grok-Bot shape: workspace persona files and skills folders were dropped in favor of Settings-stored instructions and routines. Kept for design archaeology.
+
 Hivekit is a *reduction* of ideas that already work. This file records what we borrowed so implementers do not have to reverse-engineer 80k commits.
 
 Sources consulted 2026-08-26:

@@ -2,14 +2,18 @@
 
 ## What to do
 
-Treat each workstream file as a contract. Implementers copy the "Work" list into issues if they want, but the source of truth stays here.
+Treat each milestone file as a contract. Implementers may copy "Work" lists into issues, but the source of truth stays here.
 
-Evidence lives in `jobs/` of a real workspace or in `qa/` once that folder exists.
+Evidence lives in `qa/` (screenshots, transcripts) or command output pasted into PR descriptions.
+
+## Product north star (from PRD §12)
+
+A stranger goes README → running hive on EC2 → approves a site push from a phone → gets an overnight routine digest. If a workstream does not move that path, it is not v1.
 
 ## Definition of done (for this file)
 
-- [x] Backlog files exist and reference the PRD and architecture.
+- [x] Backlog files exist and reference the v0.2 PRD and architecture.
 - [x] Every workstream has a "Definition of done" section.
-- [ ] A maintainer has dated a "last reviewed" line below after a change to the PRD.
+- [ ] Maintainer dated a review below after each PRD change.
 
-Last reviewed: 2026-08-26 (initial draft)
+Last reviewed: 2026-08-26 (v0.2 rewrite: Grok-Bot shape, single web app, connectors site/x/email)

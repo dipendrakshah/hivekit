@@ -1,24 +1,24 @@
-# 01 — Foundation: repo, CLI, Gateway process
+# 01 — Foundation (deployable box)
 
-## What to do
+Goal: `docker compose up` on a fresh VM yields an authenticated Hivekit that can hold a trivial conversation. No agents yet.
 
-Stand up the monorepo and a Gateway that boots, loads YAML, serves health, and can be stopped cleanly.
+## Work
 
-Work:
-
-1. Create packages: `apps/gateway`, `apps/web` placeholder, `packages/protocol`.
-2. Node 22 + TypeScript ESM + one test runner (node:test or vitest). Pick one and write it in README.
-3. `hivekit` CLI stubs: `init`, `doctor`, `gateway`, `vault set`, `version`.
-4. `init` copies `templates/workspace/*` and `config/hivekit.example.yaml` to `~/.hivekit/`.
-5. Gateway reads config, binds `127.0.0.1:8787`, answers `GET /health` and WS `req.hello`.
-6. Graceful shutdown on SIGINT. Second instance refuses the port with a readable error.
-7. Docker Compose: gateway + volume for workspace.
+- [ ] Monorepo scaffold: `apps/gateway`, `apps/web`, `packages/{protocol,models,tools,connectors}`; TypeScript, Node 22+.
+- [ ] Config loader for `config/hivekit.example.yaml` shape + env overrides (`HIVEKIT_TOKEN`, `HIVEKIT_MASTER_KEY`, `PUBLIC_URL`).
+- [ ] SQLite (better-sqlite3, WAL) with migrations for: threads, messages, jobs, tasks, routines, approvals, settings, vault.
+- [ ] Vault: AES-256-GCM encrypt/decrypt keyed by `HIVEKIT_MASTER_KEY`; redaction helper (`sk-***`) applied to all log paths.
+- [ ] HTTP server serving static UI build + WSS at `/ws`; frame protocol `req.hello` / `req.chat.send` / events per ARCHITECTURE §4.1.
+- [ ] Auth: first-login owner passkey, signed session cookies, single operator.
+- [ ] `deploy/docker-compose.yml` + Caddyfile + `.env.example`.
+- [ ] Deploy guides: EC2 (Lightsail/t4g.nano), Fly/Railway volume note, Cloudflare DNS/Tunnel pattern.
+- [ ] `hivekit doctor` exec command: config parse, DB writable, disk, TLS reachable.
 
 ## Definition of done
 
-- [ ] `hivekit init && hivekit doctor && hivekit gateway` works on macOS and Linux without extra undocumented env vars.
-- [ ] `curl -s localhost:8787/health` returns JSON `{ ok, version, workspace }`.
-- [ ] Two gateways on the same port: the second prints "already running" and exits non-zero.
-- [ ] `init` is idempotent: running twice does not overwrite a dirty `USER.md`.
-- [ ] Unit test for config load (missing file, bad YAML, default port).
-- [ ] Compose file documented in README; `docker compose up` reaches `/health`.
+- [ ] Fresh Ubuntu 24.04 VM: clone → compose up → open HTTPS URL → set passkey → send message → receive echoed reply in < 15 min total.
+- [ ] Second browser (phone) logs in with passkey and sees the same thread.
+- [ ] Kill -9 the container mid-conversation; restart; history intact.
+- [ ] `doctor` exits 0 on healthy stack and names the broken check when a var is unset.
+
+Last reviewed: 2026-08-26
