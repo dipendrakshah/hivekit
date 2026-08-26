@@ -48,7 +48,9 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [hivekit]
+depends_on:
+      hivekit:
+        condition: service_healthy
 
   # --- Alternative to Caddy: Cloudflare Tunnel. Nothing inbound on the host. ---
   # Drop the caddy service above and set PUBLIC_URL to your tunnel hostname.
