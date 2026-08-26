@@ -1,4 +1,4 @@
-# 04 — Web app (the only client)
+# 05 — Web app (the only client)
 
 Goal: one responsive app that makes desktop feel like Slack-with-teeth and phone feel like texting your hive.
 

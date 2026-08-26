@@ -1,4 +1,4 @@
-# 05 — Hardening + release
+# 06 — Hardening + release
 
 Goal: safe to leave running on the public internet, boring to upgrade, documented for a stranger.
 

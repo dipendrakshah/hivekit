@@ -1,4 +1,4 @@
-# 02 — Models + master/worker runtime
+# 03 — Models + master/worker runtime
 
 Goal: the master plans and spawns parallel workers on configurable models; spend is metered; models hot-swap.
 

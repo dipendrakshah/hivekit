@@ -258,6 +258,11 @@ In-process cron via **croner** (schedule state persisted in SQLite so reboot-saf
 ### 4.7 Vault & auth
 
 - First login sets an owner passkey; sessions are signed cookies; single-operator.
+- **"Passkey" means a hashed passphrase, not WebAuthn.** Hashed with Argon2id via
+  `Bun.password` (no extra dependency); compared in constant time. WebAuthn is deferred to
+  v2 — it needs attestation handling and a credential-recovery story that no v1 surface can
+  justify. Loss recovery is out-of-band: set a new `HIVEKIT_TOKEN` on the box, use it to log
+  in, re-set the passphrase.
 - Secrets (provider keys, X keys, IMAP app password) stored AES-256-GCM, key from `HIVEKIT_MASTER_KEY` env; never sent to clients after save; redacted (`sk-***`) in all logs.
 - Stealth/free models show a persistent banner when routed sensitive scopes (e.g., email).
 

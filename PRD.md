@@ -140,7 +140,7 @@ Done when the file exists and the timeline shows plan → workers → merge.
 
 - FR-C1. One responsive web app served by the Gateway itself. Desktop layout: nav rail + thread + status rail. Mobile: bottom tabs + full-width thread.
 - FR-C2. WebSocket (WSS) for live updates; REST fallback not required in v1.
-- FR-C3. Auth: owner passkey set on first login; session cookies; HTTPS terminated by Caddy or Cloudflare in front of the box.
+- FR-C3. Auth: owner passkey (an Argon2id-hashed passphrase — WebAuthn is v2) set on first login; session cookies; HTTPS terminated by Caddy or Cloudflare in front of the box.
 - FR-C4. Artifacts render inline: markdown, HTML preview, images, CSV tables, plain diffs.
 
 ### 7.6 Safety

@@ -1,4 +1,4 @@
-# 03 — Connectors + routines
+# 04 — Connectors + routines
 
 Goal: the three v1 connectors work end to end, and recurring jobs run unattended with approvals waiting in-thread.
 

@@ -62,7 +62,7 @@ Do not replace this with a generic purple-on-navy AI dashboard. The product is a
   never the default focus**.
 - Diffs, tables and long payloads scroll inside their own container. The page body never
   scrolls horizontally at 360 px.
-- Target Lighthouse a11y ≥ 90 on the thread view (see `todo/04-web-app.md`).
+- Target Lighthouse a11y ≥ 90 on the thread view (see `todo/05-web-app.md`).
 
 ## Not mocked
 
