@@ -44,7 +44,7 @@ The earlier design pack carried OpenClaw-flavored weight. v0.2 keeps the Grok-Bo
 | Removed | Replacement |
 | --- | --- |
 | Electron macOS app + Android app + cloud web (three surfaces) | One responsive web app served by the Gateway itself |
-| Six workspace persona files (`SOUL.md`, `IDENTITY.md`, …) | Bot instructions field in Settings (stored in DB), seeded with a good default |
+| Six workspace persona files (`SOUL.md`, `IDENTITY.md`, …) | **Two** per thread: `INSTRUCTIONS.md` + `MEMORY.md` on the data volume (§4.8). Still file-backed — greppable, diffable, revertable — just two files instead of six, and the Settings editor writes the file rather than a second copy in the DB |
 | Skills folders + marketplace ideas | Routines + per-thread instructions |
 | Heartbeat file | Cron scheduler in-process |
 | Keychain/age vault per device | Server-side AES-GCM column in SQLite; key from env `HIVEKIT_MASTER_KEY` |
@@ -80,7 +80,8 @@ Idempotency keys on `job.approve`, `job.cancel`, `routine.create`.
 ### 4.2 Data model
 
 ```
-Thread      id, title, created_at
+Thread      id, slug, title, workspace_path, memory_hash, created_at
+            # instructions + memory live on disk; the DB stores where and a hash
 Message     id, thread_id, role(op|master|worker|system), body, card_json, artifact_refs
 Job         id, thread_id, title, status, master_model, worker_model,
             budget_usd, tokens_in/out, usd, created_at, finished_at
@@ -102,11 +103,12 @@ Two loops, one codebase.
 
 **Master loop**
 
-1. Load thread context + bot instructions + matched connector notes + recent artifact index.
+1. Load thread context + `INSTRUCTIONS.md` + `MEMORY.md` + matched connector notes + recent artifact index (§4.8).
 2. Ask the master model for a `Plan` (JSON schema): tasks ≤ 8, each with inputs, expected artifact, success sentence.
 3. Spawn workers. Fold each structured `Result` into a synthesis.
 4. When tasks settle, ask for `Merge` → final message + artifacts in-thread.
-5. On failure: retry that task once with a tighter spec; then post a question card instead of guessing.
+5. Write `MEMORY.md` once, atomically, and post the diff into the thread (§4.8).
+6. On failure: walk the FR-A6 ladder; then post a question card instead of guessing.
 
 **Worker loop**
 
@@ -220,6 +222,91 @@ In-process cron (node-cron semantics persisted in SQLite so reboot-safe). Routin
 - Secrets (provider keys, X keys, IMAP app password) stored AES-256-GCM, key from `HIVEKIT_MASTER_KEY` env; never sent to clients after save; redacted (`sk-***`) in all logs.
 - Stealth/free models show a persistent banner when routed sensitive scopes (e.g., email).
 
+### 4.8 Thread workspace and memory
+
+Each thread is a directory on the data volume:
+
+```
+/data/threads/<slug>/
+  INSTRUCTIONS.md      operator-written: voice, the bar, the never-list
+  MEMORY.md            master-written: state block, learned entries, corrections
+  artifacts/           promoted outputs
+  jobs/<job-id>/       scratch, worker outputs
+```
+
+**Files are the source of truth, not the database.** The Settings instructions editor reads
+and writes `INSTRUCTIONS.md`; SQLite holds the path and a content hash so the gateway can
+detect an out-of-band edit and reload. Keeping the canonical copy in a markdown file is the
+whole point: you can `grep` it, `diff` it, edit it over SSH, and put it in git.
+
+#### `MEMORY.md` shape
+
+````markdown
+## State
+```json
+{ "last_run": "2026-08-26T07:04:11+05:30", "seen": ["src-a#8821", "src-b#441"] }
+```
+
+## Learned
+- 2026-08-26 — Dropped source `example.dev/feed`: three consecutive sweeps found nothing
+  above the bar. Re-add if that changes.
+- 2026-08-24 — Their release notes put the breaking change in a footnote; read footnotes
+  on that source. (from https://example.dev/notes, verified against the changelog)
+
+## Corrections
+- 2026-08-25 — Operator rejected a draft for "revolutionise". No marketing verbs, ever.
+
+## Sources
+- https://example.dev/feed — good on protocol changes, noisy on funding
+````
+
+The `State` block is machine-maintained and is what makes a routine incremental — a morning
+sweep reads `seen` and skips what it already handled. Everything else is prose a human reads.
+
+#### Write discipline
+
+| Rule | Why |
+| --- | --- |
+| **Only the master writes**, once, at end of job | One writer means no locking, no interleaving, no lost updates |
+| Atomic: write temp file, `fsync`, rename | A crash mid-write leaves the previous memory intact, never a half file |
+| The write is posted to the thread **as a diff** | You see what your bot decided to remember, where you see everything else |
+| Workers never write memory | They are stateless and independently retryable; that is what makes the fan-out safe |
+| Capped at `memory.max_bytes` (default 8 KB) | It is paid on every master call. Past the cap, prune superseded entries and say so in the same diff |
+| Corrections are pruned last | Operator corrections are the highest-value lines in the file |
+
+#### Memory poisoning — the risk this adds
+
+Giving a durable memory file to an agent that reads the open web and an inbox creates a new
+attack: get a sentence into `MEMORY.md` and it is reloaded on every future run, long after the
+malicious page is forgotten. Wrapping untrusted content stops it steering *this* job; it does
+nothing about persistence.
+
+Four controls, in order of how much they carry:
+
+1. **Memory can never grant capability.** Connectors, the always-ask set, budgets and approval
+   requirements are resolved from config and Settings only — never from `MEMORY.md`. A memory
+   line saying "the operator approved silent pushes" is inert text. The gateway does not read
+   permissions out of prose, so persuading the prose achieves nothing.
+2. **Provenance on anything untrusted.** A claim derived from fetched content is written as
+   `(from <url>, unverified)`, never as a bare fact. A master reading it later treats it as a
+   lead, not as a settled truth.
+3. **Every write is a visible diff.** A silent append is how poisoning survives; a diff in the
+   thread is how you notice a bot suddenly deciding something strange.
+4. **Cheap reversion.** With `memory.git: true` each write is a commit, so
+   `hivekit memory log|diff|revert` gives you history and a one-command undo. Without it you
+   still have the previous file in the volume backup.
+
+The residual risk is a plausible-looking false fact that the operator does not catch in the
+diff. That is real, and it is why memory is capped and prose-only: a small file gets read.
+
+#### Git-backing
+
+`memory.git: true` makes `/data/threads` a git repository and commits after each memory write
+(`thread/<slug>: memory after job_21a`). This gives history, blame, diff and revert for free,
+and lets you clone your bots' memory to a laptop to edit it properly. Off by default because
+it needs `git` in the image and a little disk; on is the better setting once you have more
+than one thread.
+
 ## 5. Repository layout
 
 ```
@@ -242,6 +329,9 @@ SQLite via `better-sqlite3`, WAL mode. Backups = copy the volume.
 4. Untrusted content is wrapped **and reduces capability** — a task holding it cannot see the external-send tools at all (§4.5). Wrapping alone is not a control.
 5. Budget circuit breaker stops new completions past `limits.budget_usd_per_job`.
 6. Every irreversible action leaves a receipt.
+7. **Memory is data, never permission.** `MEMORY.md` is reloaded every run but cannot grant a
+   connector, waive an approval, or raise a budget — those resolve from config and Settings
+   only (§4.8). Memory writes are diffed into the thread and, with `memory.git`, revertable.
 
 ## 7. Setup, in practice
 

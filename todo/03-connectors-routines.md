@@ -14,7 +14,7 @@ Goal: the three v1 connectors work end to end, and recurring jobs run unattended
 - [ ] Approval receipts: every irreversible action persisted with payload/diff, deciding human, model, timestamp; browsable in Receipts tab.
 - [ ] Scheduler: cron routines persisted in SQLite, reboot-safe; missed runs catch up once flagged late; notify policies (`always`, `on-approval-only`, `silent-until-done`).
 - [ ] Routine CRUD from thread ("every morning at 07:00 …") and Routines tab; pause/resume/edit without losing history.
-- [ ] Incremental routines: content-hash skip so a daily sweep only processes what changed.
+- [ ] Incremental routines: the `State` block in `MEMORY.md` plus content-hash skip, so a daily sweep only processes what changed.
 - [ ] Preflight before each scheduled run: budget left, provider reachable, connector auth valid, disk, previous run not still going. A failure notifies and does not consume the slot.
 
 ## Definition of done
@@ -24,7 +24,8 @@ Goal: the three v1 connectors work end to end, and recurring jobs run unattended
 - [ ] Inbox sweep produces morning digest; urgent sender pinned; drafted reply sends only after approval.
 - [ ] VM reboot mid-routine: catch-up run executes once and is labeled late.
 - [ ] All three connectors show green in `hivekit doctor`.
-- [ ] A second routine run over unchanged sources makes **zero model calls** — asserted by counter, not by timing.
+- [ ] A second routine run over unchanged sources makes **zero model calls** — asserted by counter, not by timing. Clearing `seen` in `MEMORY.md` forces a full re-run.
+- [ ] An operator correction recorded in `MEMORY.md` changes behaviour on the next run — the headline reason memory is worth having. Test: reject a draft for a stated reason, assert the next run's master prompt contains that correction and the output complies.
 - [ ] A source page carrying an injection payload produces a flagged approval card and **zero tool escalations**; the acting model provably never sees the raw page text.
 - [ ] `exec.run` never goes through a shell: `; rm -rf /` passed as an argument is treated literally.
 - [ ] `x.post` / `email.send` cannot execute without an approval receipt even in `auto` mode.

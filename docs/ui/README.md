@@ -9,6 +9,7 @@ One responsive web app served by the Gateway itself — desktop and phone are th
 | Routine confirm | Plain language → `{cron, prompt, connectors, notify}` shown back as a card. Nothing persists until you tap Save |
 | Settings · models | The split-brain screen: master seat, worker seat, and what a swap would cost |
 | Receipts | Every irreversible action with payload, decider, model and timestamp |
+| Thread memory | `MEMORY.md` with the last write as a diff, corrections, the state block, and revert |
 
 ## Patterns borrowed from Grok Bot (x.ai/bot)
 
@@ -47,6 +48,9 @@ Do not replace this with a generic purple-on-navy AI dashboard. The product is a
    failing twice and a good one succeeding is the design working, not something to hide.
 6. **Never a spinner alone.** Every progress indicator is backed by a real task or token count.
    "Is it stuck?" should never need asking.
+7. **Memory writes are visible.** What a bot decides to remember lands in the thread as a diff,
+   never as a silent append — a durable false belief is far more expensive than a wrong answer,
+   and the diff is where you catch it.
 
 ## Accessibility floor
 

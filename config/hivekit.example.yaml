@@ -26,6 +26,15 @@ models:
   reviewer:                              # optional, deferred to v1.1 by default
     enabled: false
 
+# Each thread is a directory: INSTRUCTIONS.md (you write) + MEMORY.md (the master writes).
+# The files are the source of truth; SQLite stores the path and a content hash.
+threads_dir: /data/threads
+
+memory:
+  max_bytes: 8192          # loaded on every master call, so this is paid repeatedly
+  git: false               # true = commit each memory write; enables `hivekit memory log|revert`
+  diff_in_thread: true     # post the memory diff into the thread. Leave this on.
+
 limits:
   max_workers_per_job: 8
   max_spawn_depth: 1                     # not configurable above 1

@@ -18,6 +18,11 @@ Goal: `docker compose up` on a fresh VM yields an authenticated Hivekit that can
 - [ ] Vault: AES-GCM column, key from `HIVEKIT_MASTER_KEY`; a missing key is a clear startup error, never a silent plaintext fallback.
 - [ ] Redaction at the serialisation boundary — the writer holds the active secret set — not a regex over finished strings.
 - [ ] `deploy/` builds and runs: Dockerfile, compose, Caddyfile.
+- [ ] Thread workspace: `/data/threads/<slug>/` with `INSTRUCTIONS.md`, `MEMORY.md`, `artifacts/`, `jobs/<id>/`; created on thread creation from the seed templates.
+- [ ] `INSTRUCTIONS.md` is the source of truth — Settings reads/writes the file, SQLite stores path + content hash, and an out-of-band edit is detected and reloaded.
+- [ ] Memory writer: master-only, once per job, atomic (temp → fsync → rename), capped at `memory.max_bytes`, prune-with-note past the cap.
+- [ ] Memory diff posted into the thread on every write.
+- [ ] Optional git-backing (`memory.git`) + `hivekit memory log|diff|revert`.
 
 ## Definition of done
 
@@ -29,5 +34,9 @@ Goal: `docker compose up` on a fresh VM yields an authenticated Hivekit that can
 - [ ] `SIGKILL` mid-job then restart reproduces the exact job state — an actual kill, not a graceful shutdown.
 - [ ] Leak suite: synthetic keys of every provider shape **plus a custom shape**, at every nesting depth including inside `Error.cause`, never appear in logs, thread transcripts, WS frames or error reports. Runs on every PR.
 - [ ] `docker compose -f deploy/docker-compose.yml up -d` reaches a healthy container on a clean machine, verified by CI.
+- [ ] Editing `INSTRUCTIONS.md` over SSH is picked up by the next job with no restart; editing it in Settings changes the file on disk. One store, no drift.
+- [ ] A `SIGKILL` during a memory write leaves the previous `MEMORY.md` intact and parseable — never a half file.
+- [ ] A worker asked for `MEMORY.md` is refused; a test asserts it is absent from the worker's rendered prompt.
+- [ ] With `memory.git: true`, `hivekit memory revert` restores the previous memory and the next job uses it.
 
 Last reviewed: 2026-08-26

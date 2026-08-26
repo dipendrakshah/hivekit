@@ -4,12 +4,17 @@ There is no skills system (PRD §4). A bot's behaviour is the **instructions fie
 Settings plus its routines. These are starting points for that field — paste one in, edit the
 specifics, delete what you do not want.
 
+These seed `INSTRUCTIONS.md` in a thread's workspace
+(`/data/threads/<slug>/`). The file is the source of truth — the Settings editor reads and
+writes it, so you can equally edit it over SSH or keep the directory in git.
+
 | File | For a thread that |
 | --- | --- |
 | [site-voice.md](site-voice.md) | keeps a website updated |
 | [tweet-voice.md](tweet-voice.md) | drafts posts for X |
 | [inbox-triage.md](inbox-triage.md) | watches an inbox |
 | [file-workshop.md](file-workshop.md) | turns a pile of files into something you can open |
+| [MEMORY.template.md](MEMORY.template.md) | seeds the companion `MEMORY.md` the master maintains |
 
 Pair them with the matching routine in [example-jobs.md](../example-jobs.md).
 

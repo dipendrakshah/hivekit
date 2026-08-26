@@ -181,12 +181,22 @@ Two things to know:
 
 ## Backup and restore
 
-Everything is in the `hivekit_data` volume.
+Everything is in the `hivekit_data` volume — including `/data/threads`, which holds each
+thread's `INSTRUCTIONS.md`, `MEMORY.md` and artifacts. Losing that loses what your bots have
+learned, which is harder to recreate than the database.
 
 ```bash
 docker compose exec hivekit sqlite3 /data/hivekit.db ".backup /data/backup.db"
 docker run --rm -v hivekit_data:/d -v "$PWD":/out alpine \
-  tar czf /out/hivekit-$(date +%F).tar.gz -C /d backup.db artifacts
+  tar czf /out/hivekit-$(date +%F).tar.gz -C /d backup.db threads
+```
+
+If you set `memory.git: true`, `/data/threads` is itself a git repository — you can push it to
+a private remote and get off-box history of every memory write for free:
+
+```bash
+docker compose exec hivekit git -C /data/threads remote add origin git@github.com:you/hive-memory.git
+docker compose exec hivekit git -C /data/threads push -u origin main
 ```
 
 Store `HIVEKIT_MASTER_KEY` **separately** from the archive — the archive is useless without
