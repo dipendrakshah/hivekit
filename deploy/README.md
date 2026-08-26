@@ -182,8 +182,9 @@ Two things to know:
 ## Backup and restore
 
 Everything is in the `hivekit_data` volume — including `/data/threads`, which holds each
-thread's `INSTRUCTIONS.md`, `MEMORY.md` and artifacts. Losing that loses what your bots have
-learned, which is harder to recreate than the database.
+thread's `INSTRUCTIONS.md`, `MEMORY.md`, the `memory/` sidecars (candidates, archive, usage
+ledger) and artifacts. Losing that loses what your bots have learned and the evidence behind
+it, which is harder to recreate than the database.
 
 ```bash
 docker compose exec hivekit sqlite3 /data/hivekit.db ".backup /data/backup.db"

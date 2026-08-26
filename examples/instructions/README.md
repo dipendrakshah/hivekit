@@ -14,7 +14,7 @@ writes it, so you can equally edit it over SSH or keep the directory in git.
 | [tweet-voice.md](tweet-voice.md) | drafts posts for X |
 | [inbox-triage.md](inbox-triage.md) | watches an inbox |
 | [file-workshop.md](file-workshop.md) | turns a pile of files into something you can open |
-| [MEMORY.template.md](MEMORY.template.md) | seeds the companion `MEMORY.md` the master maintains |
+| [MEMORY.template.md](MEMORY.template.md) | seeds the companion `MEMORY.md` — four tiers, and what never belongs in it |
 
 Pair them with the matching routine in [example-jobs.md](../example-jobs.md).
 
@@ -37,3 +37,17 @@ Two things earn their space more than anything else:
 
 Keep it under a page. It is loaded on every master call and every worker call, so length here
 is paid repeatedly.
+
+## Instructions vs memory
+
+A useful split, and the one that keeps memory from rotting:
+
+| Goes in `INSTRUCTIONS.md` | Goes in `MEMORY.md` |
+| --- | --- |
+| Standing preferences you own — voice, the bar, the never-list | Things the bot worked out — which sources pay off, where a site hides its breaking changes |
+| Unfalsifiable by nature ("write concisely") | Falsifiable, with a `wrong-if` that can retire it |
+| Changes when you change your mind | Changes when evidence changes |
+
+If the master ever proposes a memory rule you cannot write a `wrong-if` for, that is a sign it
+belongs here instead — as a line you wrote deliberately, not one it inferred from a single
+event.

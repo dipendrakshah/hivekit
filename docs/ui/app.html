@@ -347,43 +347,48 @@
 
     <!-- memory -->
     <div>
-      <p class="caption">Thread memory · what this bot believes, and when it decided</p>
+      <p class="caption">Thread memory · four tiers, and what is actually loaded</p>
       <div class="mini">
-        <div class="hd">threads / site-updates / MEMORY.md</div>
+        <div class="hd">threads / site-updates / memory</div>
         <div class="bd">
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            <span class="tag">8 KB cap · 2.1 KB used</span>
-            <span class="tag free">git-backed</span>
-            <span class="tag">14 commits</span>
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <span class="tag">412 entries stored</span>
+            <span class="tag free">~640 tok loaded</span>
+            <span class="tag">git-backed</span>
           </div>
+          <p class="caption" style="margin:0 0 12px">Size is decoupled from cost: only Pinned, State and scope-matched top-K enter the prompt.</p>
 
-          <p class="lbl">Last write · after job_21a · 07:04</p>
-          <div class="diff"><span class="add">+ 2026-08-26 — Dropped source example.dev/feed: three consecutive</span>
-<span class="add">+   sweeps found nothing above the bar. Re-add if that changes.</span>
-<span class="del">- 2026-08-19 — example.dev/feed looks promising, watch it.</span></div>
+          <p class="lbl">Pinned · yours · always loaded</p>
+          <div class="fld" style="font-size:12px">[p1] No marketing verbs, ever.
+            <div class="hint">·op 2026-08-25 · never auto-retired</div></div>
 
-          <p class="lbl" style="margin-top:12px">Corrections · pruned last</p>
-          <div class="fld" style="font-size:12px">2026-08-25 — Rejected a draft for "revolutionise". No marketing verbs, ever.
-            <div class="hint">yours, verbatim · survives every prune</div></div>
+          <p class="lbl">Rules · retrieved for this job (2 of 47)</p>
+          <div class="fld" style="font-size:12px">[r7] Read footnotes on example.dev — breaking changes hide there.
+            <div class="hint">·when source=example.dev ·wrong-if body-only break ·3/3 ·used 12</div></div>
+          <div class="fld" style="font-size:12px;opacity:.55">[r12] Cross-check release dates against the changelog.
+            <div class="hint">·when kind=release ·not retrieved — scope did not match</div></div>
 
-          <p class="lbl">State</p>
-          <div class="fld" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px">{ "last_run": "2026-08-26T07:04+05:30", "seen": [ 41 ids ] }
-            <div class="hint">clear <code>seen</code> to force a full re-sweep</div></div>
+          <p class="lbl">Candidates · waiting for evidence</p>
+          <div class="fld" style="font-size:12px">"Their RSS lags the site by ~6h"
+            <div class="hint">1 of 3 confirmations · costs nothing until promoted</div></div>
 
           <div class="btnrow">
-            <button class="btn ghost">Edit file</button>
-            <button class="btn ghost">History</button>
-            <button class="btn danger">Revert last write</button>
+            <button class="btn ghost">Why is this here</button>
+            <button class="btn ghost">Pin</button>
+            <button class="btn danger">Retire</button>
           </div>
 
           <div class="approve" style="max-width:none;margin-top:14px">
-            <h4>Why every write shows as a diff</h4>
-            <div style="font-size:12.5px">This thread reads the open web. A page that talks a
-              model into writing one durable sentence here would be reloaded on every future
-              run, long after the page is forgotten. So: memory can never grant a connector or
-              waive an approval — those come from config, not prose — and every write lands
-              in the thread where you will see it.</div>
+            <h4>Audit · run 20 · memory held out</h4>
+            <div style="font-size:12.5px">Same job with retrieval off: <b>1 more operator edit</b>,
+              same approval rate, $0.002 cheaper. Memory is earning its tokens — narrowly.
+              <div class="diff" style="margin-top:8px"><span class="add">+ r7 saved one round-trip on the footnote catch</span>
+<span class="del">- 3 rules retrieved 40× have never changed an outcome → retire?</span></div>
+            </div>
           </div>
+
+          <p class="caption" style="margin:12px 0 0">Every write lands here as a diff, and one
+            observation never becomes a rule — it waits for three, in three different jobs.</p>
         </div>
       </div>
     </div>

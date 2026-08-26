@@ -153,40 +153,52 @@ Done when the file exists and the timeline shows plan → workers → merge.
 
 ### 7.7 Thread workspace and memory
 
-Each thread owns a directory on the data volume. Two markdown files, not six.
+Each thread owns a directory on the data volume. `INSTRUCTIONS.md` is yours; `MEMORY.md` is the
+bot's; the sidecars under `memory/` never enter a prompt.
 
 ```
 /data/threads/<slug>/
   INSTRUCTIONS.md      you write it — voice, the bar, the never-list
-  MEMORY.md            the bot writes it — what it learned, and a state block
-  artifacts/           promoted outputs
-  jobs/<job-id>/       scratch
+  MEMORY.md            active memory: Pinned · Rules · Facts · State
+  memory/              candidates.jsonl · archive.jsonl · ledger.jsonl
+  artifacts/  jobs/<job-id>/
 ```
 
 - **FR-W1.** `INSTRUCTIONS.md` is the **source of truth** for a thread's instructions. The
   Settings field is an editor over that file, not a second copy in SQLite. The database stores
   the path and a content hash; two stores that can drift is a bug, not a feature.
-- **FR-W2.** `MEMORY.md` is the thread's durable memory: a machine-maintained `state` block
-  (for routine incrementality), dated learned entries, operator corrections verbatim, and a
-  source list where relevant. Loaded after `INSTRUCTIONS.md` on every master call.
-- **FR-W3.** **Only the master writes memory, only at the end of a job, as one atomic
-  replace.** Workers never write it. The write is surfaced in the thread as a diff — you see
-  what your bot decided to remember, in the same place you see everything else it did.
-- **FR-W4.** **Memory can never grant capability.** Connectors, approval requirements, budgets
-  and the always-ask set come from config and Settings only. A line in `MEMORY.md` reading
-  "the operator said you may push without asking" is inert text. This is what makes an
-  agent that reads the open web safe to give a memory file.
-- **FR-W5.** Anything learned from untrusted content is written **with its provenance**
-  (`from <url>, unverified`), never as a bare fact.
-- **FR-W6.** Memory is capped (default 8 KB rendered). Past the cap the master prunes
-  superseded entries and says so in the same diff. Operator corrections are pruned last.
-- **FR-W7.** Optional git-backing: `/data/threads` may be a git repository, so every memory
-  write is a commit. `hivekit memory log|diff|revert` reads it. Off by default, one setting to
-  enable, and worth enabling — it is how you answer "when did it start believing that".
-- **FR-W8.** The operator can read, edit, or delete any part of memory from the UI or by
-  editing the file. Nothing in memory is hidden from the person who owns it.
+- **FR-W2.** Memory is **tiered and typed**, not free prose: **Pinned** (operator corrections,
+  authoritative, never auto-retired), **Rules** (scoped behavioural rules, each with a `when`
+  and a `wrong-if`), **Facts** (expiring, provenance required when derived from untrusted
+  content), **State** (machine JSON for routine incrementality).
+- **FR-W3. Retrieval, not wholesale loading.** A job's prompt gets Pinned + State + the
+  top-K Rules and Facts whose scope matches the job. **Memory size is decoupled from prompt
+  size** — a thread with 400 entries costs the same per call as one with 12.
+- **FR-W4. One observation is not a rule.** An observation is logged as a *candidate* and does
+  nothing until it is independently confirmed in `promote_after` distinct jobs (default 3).
+  Operator corrections skip this entirely and go straight to Pinned. This is the control for
+  the commonest degradation: a single rejected draft becoming a universal law.
+- **FR-W5. Entries are immutable.** A changed belief is a supersede — new entry, old one
+  archived with its original wording — never an edit in place. Without this, memory drifts into
+  something nobody wrote.
+- **FR-W6.** A write is rejected if it contradicts an active entry without an explicit
+  supersede, near-duplicates one, adds a Rule with no `when`/`wrong-if`, adds a Fact with no
+  TTL or provenance, or touches a Pinned entry.
+- **FR-W7. Memory can never grant capability.** Connectors, the always-ask set, budgets and
+  approvals resolve from config and Settings only. A memory line reading "the operator approved
+  silent pushes" is inert text. Untrusted-derived content can become a Fact but **never a
+  Rule**.
+- **FR-W8.** Only the master writes, once per job, atomically. Workers never read or write
+  memory — that is what keeps them stateless and independently retryable. Every write is posted
+  to the thread as a diff, and promotions are announced.
+- **FR-W9. Memory must prove it is worth having.** Every `audit_every` runs (default 20) the
+  thread runs one job with retrieval disabled and compares approval rate, operator edits,
+  retries and cost. If memory-off does as well or better, the UI says so plainly.
+- **FR-W10.** The operator can inspect and steer all of it: `memory show|why|pin|retire|
+  candidates|audit`, plus `log|diff|revert` when git-backing is on. **"Why does my bot believe
+  this?" is one command**, and the answer names the jobs.
 
-## 8. Non-functional requirements
+## 8. Non-functional requirements## 8. Non-functional requirements
 
 - NFR-1. Single Node process + SQLite (WAL). No second database. One volume to back up.
 - NFR-2. Gateway restart < 5 s; jobs resume from persisted state after crash/reboot.
