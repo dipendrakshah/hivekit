@@ -1,0 +1,24 @@
+# Auto-TLS in front of the gateway.
+# HIVE_HOST comes from the environment (see docker-compose.yml).
+
+{$HIVE_HOST} {
+	encode zstd gzip
+
+	# WSS: the thread is a long-lived WebSocket. Do not buffer, do not time it out.
+	@ws {
+		header Connection *Upgrade*
+		header Upgrade    websocket
+	}
+	reverse_proxy @ws hivekit:8787
+
+	reverse_proxy hivekit:8787 {
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options    "nosniff"
+		Referrer-Policy           "no-referrer"
+		-Server
+	}
+}

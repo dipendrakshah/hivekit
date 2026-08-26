@@ -41,3 +41,32 @@ Community shorthand `0xAlpha` maps to OpenRouter slug `stealth/ox-alpha` (appear
 ## Claude Fable and Meta routes
 
 PRD examples use Claude Fable 5 as a plausible **master** and a Meta Llama / Muse-class model as a plausible **worker**. Slugs change. The architecture depends on **roles**, not on a frozen catalog. The UI must let the operator type any model id.
+
+---
+
+## The one idea neither reference system has
+
+**Master and worker are different models, chosen by you.**
+
+Grok Bot runs xAI models. OpenClaw lets you pick a model but does not make the
+planner/executor split a first-class configuration axis. That split is Hivekit's entire
+economic argument: a capable model plans and merges (2–3 calls), free models do the volume
+(4–8 calls), and code — not a model — checks the results. A morning routine lands around
+$0.03–0.10, roughly 90% of it the master.
+
+It only works because of two mechanisms that neither reference system needed:
+
+1. **Capability-aware rendering** ([ARCHITECTURE §4.4.1](../ARCHITECTURE.md)) — a model with
+   no tool calling, no JSON mode, no system role and an 8k window is still a usable worker.
+   Without it, "bring any model" quietly means "bring any frontier model".
+2. **Code-first verification with a specific-error retry**
+   ([§4.4.2](../ARCHITECTURE.md)) — a weak model's mistakes are caught in milliseconds by a
+   validator and retried with the exact error attached, rather than being published.
+
+## Where Hivekit is stricter than both
+
+**Untrusted content reduces capability.** Both reference systems wrap fetched content and
+instruct the model not to obey it. Hivekit does that *and* removes `site.push`, `x.post`,
+`email.send` and `exec.run` from any task holding untrusted content — the tools are absent,
+not denied. Wrapping is necessary and insufficient; removal is what holds against a payload
+that fully convinces the model.

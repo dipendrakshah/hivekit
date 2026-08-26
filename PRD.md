@@ -26,6 +26,11 @@ Hivekit is a **self-hosted agent hive with Grok-Bot simplicity**. One container 
 
 The master plans. Workers execute in parallel through built-in connectors — your website's git repo, your X/Twitter account, your inbox. Irreversible steps come back as inline approval cards in the same thread. Recurring work ("every morning, update my site") is saved as a **routine** that fires on cron.
 
+The economics are the point of the split: the master plans and merges (2–3 calls on a good
+model), workers do the volume (4–8 calls on a free one), and **code — not a model — checks the
+results**. A morning site routine lands around $0.03–0.10, and roughly 90% of that is the
+master.
+
 If you can run `docker compose up` on a $5 VPS, you can run Hivekit.
 
 ## 3. Goals
@@ -39,6 +44,8 @@ If you can run `docker compose up` on a $5 VPS, you can run Hivekit.
 | G5 | Real connectors v1 | Website (git publish), X/Twitter (post), Email (IMAP read / SMTP send) |
 | G6 | Routines | Any job can become a cron routine from the thread |
 | G7 | Safe defaults | External/irreversible actions always require approval; keys encrypted at rest |
+| G8 | Cheap to run | VM $4–12/mo; a daily site routine ≈ $0.03–0.10 of model spend, ~90% of it the master |
+| G9 | Any model works | A worker model with no tool calling, no JSON mode and an 8k window still completes tasks (FR-M8) |
 
 ## 4. Non-goals (v1)
 
@@ -100,6 +107,7 @@ Done when the file exists and the timeline shows plan → workers → merge.
 - FR-M5. Fallback chain per role (`primary`, `fallback`), auto-switch on 429/outage.
 - FR-M6. Cost + token accounting per job, per worker, per model. Shown in-thread and in Settings.
 - FR-M7. Free/stealth models are first-class (`price: 0` catalog entries), with a visible warning when routed sensitive data.
+- FR-M8. **A model with no native tool calling, no JSON mode, no system role, or an 8k window still works as a worker.** The gateway probes capabilities once per model and renders the same logical request differently: native tools where present, a parsed `<hk:call>` text shim where absent, the schema inlined with a worked example where there is no JSON mode. Parsing is forgiving and repairs the usual damage (trailing commas, single quotes, prose around the block). Without this, "bring any model" means "bring any frontier model".
 
 ### 7.2 Master / worker runtime
 
@@ -108,8 +116,9 @@ Done when the file exists and the timeline shows plan → workers → merge.
 - FR-A3. Gateway spawns up to 8 workers with isolated contexts.
 - FR-A4. Workers report structured results: status, artifact paths, notes, blockers.
 - FR-A5. Master merges results and writes the final answer/artifact into the thread.
-- FR-A6. Worker failure: master retries once with a tighter spec, then surfaces a question card. Never silently drops.
-- FR-A7. Operator can stop a job or reassign a single task to another model mid-flight.
+- FR-A6. Worker results are checked **by code first** — schema, required fields, the task's `success` sentence — before any model judges them. On failure: (1) retry the same model with the *exact validator error* appended, (2) retry with a tighter spec and fewer inputs, (3) escalate to the role's fallback model, then surface a question card. Never silently drops. The specific error text is the point: a blind retry repeats the mistake.
+- FR-A7. Workers are capped at 8 tool calls and a wall clock. Calling the same tool with the same arguments twice returns "you already did that" instead of the result — small models loop, and this is cheaper than finding out via the bill.
+- FR-A8. Operator can stop a job or reassign a single task to another model mid-flight.
 
 ### 7.3 Connectors
 
@@ -139,7 +148,43 @@ Done when the file exists and the timeline shows plan → workers → merge.
 - FR-S1. Modes: `ask` (default), `auto` (allowlisted read-only tools), `strict` (nothing external without explicit per-action allow).
 - FR-S2. Always ask regardless of mode: git push, tweet send, external email, delete, spend over budget, shell outside allowlist.
 - FR-S3. Secrets redacted in logs and in worker transcripts sent to masters/providers.
-- FR-S4. Untrusted external content (pages, emails, RSS) wrapped before entering prompts; instructions inside untrusted content are never followed.
+- FR-S4. Untrusted external content (pages, emails, RSS) is tagged at ingest and the tag follows it into every prompt and derived artifact. Wrapped in delimiters and introduced as data.
+- FR-S5. **A task holding untrusted content loses `site`, `x`, `email.send` and `exec` — the tools are absent from its list, not denied at call time.** So web-facing work is two hops: one worker reads and returns structured findings with no ability to act; the master acts on findings, never on raw page text. Prompt-level "never follow instructions in content" is necessary and not sufficient; this is the part that survives a persuasive payload.
+
+### 7.7 Thread workspace and memory
+
+Each thread owns a directory on the data volume. Two markdown files, not six.
+
+```
+/data/threads/<slug>/
+  INSTRUCTIONS.md      you write it — voice, the bar, the never-list
+  MEMORY.md            the bot writes it — what it learned, and a state block
+  artifacts/           promoted outputs
+  jobs/<job-id>/       scratch
+```
+
+- **FR-W1.** `INSTRUCTIONS.md` is the **source of truth** for a thread's instructions. The
+  Settings field is an editor over that file, not a second copy in SQLite. The database stores
+  the path and a content hash; two stores that can drift is a bug, not a feature.
+- **FR-W2.** `MEMORY.md` is the thread's durable memory: a machine-maintained `state` block
+  (for routine incrementality), dated learned entries, operator corrections verbatim, and a
+  source list where relevant. Loaded after `INSTRUCTIONS.md` on every master call.
+- **FR-W3.** **Only the master writes memory, only at the end of a job, as one atomic
+  replace.** Workers never write it. The write is surfaced in the thread as a diff — you see
+  what your bot decided to remember, in the same place you see everything else it did.
+- **FR-W4.** **Memory can never grant capability.** Connectors, approval requirements, budgets
+  and the always-ask set come from config and Settings only. A line in `MEMORY.md` reading
+  "the operator said you may push without asking" is inert text. This is what makes an
+  agent that reads the open web safe to give a memory file.
+- **FR-W5.** Anything learned from untrusted content is written **with its provenance**
+  (`from <url>, unverified`), never as a bare fact.
+- **FR-W6.** Memory is capped (default 8 KB rendered). Past the cap the master prunes
+  superseded entries and says so in the same diff. Operator corrections are pruned last.
+- **FR-W7.** Optional git-backing: `/data/threads` may be a git repository, so every memory
+  write is a commit. `hivekit memory log|diff|revert` reads it. Off by default, one setting to
+  enable, and worth enabling — it is how you answer "when did it start believing that".
+- **FR-W8.** The operator can read, edit, or delete any part of memory from the UI or by
+  editing the file. Nothing in memory is hidden from the person who owns it.
 
 ## 8. Non-functional requirements
 
@@ -158,6 +203,10 @@ Supported shapes, same container:
 2. **Fly.io / Railway**: one service + attached volume.
 3. **Cloudflare**: Cloudflare has no general-purpose VM — the supported pattern is DNS proxy + Cloudflare Tunnel in front of a VM running Hivekit. Long-lived WebSockets rule out Workers as the host.
 
+Compose file, Dockerfile, Caddyfile and per-host walkthroughs live in
+[`deploy/`](deploy/README.md), including why Cloudflare Workers cannot host the gateway and
+what to use on Cloudflare instead.
+
 Config surface stays one small YAML (see `config/hivekit.example.yaml`) plus in-app Settings. The promise: if you can edit that file, you can run Hivekit.
 
 ## 10. Competitive position
@@ -174,12 +223,39 @@ Config surface stays one small YAML (see `config/hivekit.example.yaml`) plus in-
 
 Hermes Agent is the closest existing system and proves the demand for self-hosted BYOM agents. Hivekit's remaining reasons to exist against it: the split-brain economics (paid planner directing a free worker swarm), a purpose-built Grok-Bot-shaped web thread instead of TUI + third-party chats, three connectors with receipt-grade approvals rather than generic tool access, and a codebase small enough for one person to fully audit.
 
-## 11. Risks
+## 11. Risks and hard constraints
 
-- **X API tiers/costs** may constrain posting volume. Mitigate: draft-by-default means low API usage; document tier limits.
-- **Email sending from EC2 IPs** has deliverability/reputation issues. Mitigate: v1 is receive-heavy (IMAP); sending goes through the operator's own SMTP relay (e.g., Gmail app password or transactional provider).
-- **Heterogeneous master/worker models** disagree on formats. Mitigate: strict JSON schemas for plans/results; retry-once policy.
-- **Scope creep toward OpenClaw.** Mitigate: non-goals §4 are binding until a v2 PRD exists.
+Four of these are design risks with mitigations. The rest are facts about the world that no
+amount of architecture removes — they are listed so they are known before building, not
+discovered during.
+
+### Design risks
+
+- **Heterogeneous master/worker models disagree on formats.** Mitigate: strict JSON schemas
+  for plans and results, code-first validation, and the FR-A6 ladder that feeds the exact
+  validator error back to the model.
+- **Scope creep toward OpenClaw.** Mitigate: §4 non-goals are binding until a v2 PRD exists.
+- **A confident, schema-valid, wrong answer.** The residual risk of the whole system.
+  Mitigate: workers must cite a source locator for any factual claim, and the gateway checks
+  the cited span actually contains the claimed value. Mitigated, not eliminated.
+- **Email sending from VM IPs** has deliverability and reputation problems. Mitigate: v1 is
+  receive-heavy (IMAP); sending goes through the operator's own SMTP relay.
+
+### Hard constraints
+
+- **X API access is paid** above a very small free allowance, and automated posting is
+  subject to X's automation rules with account-level enforcement. This is why `x.post` is
+  approval-gated in every mode and why Hivekit ships no auto-post preset. Check the current
+  tiers against your posting volume before assuming a plan works.
+- **Gmail via API needs OAuth app verification** if you distribute the software. The
+  supported path for a self-hosted single operator is **IMAP with an app password**. OAuth
+  is optional and undocumented in v1.
+- **Free and stealth model routes get withdrawn or throttled without notice**, and many
+  retain prompts for training. The fallback chain absorbs the first; nothing makes the second
+  invisible, so sensitive scopes (email) refuse stealth providers by default.
+- **Always-on costs money.** A few dollars a month for the VM plus model spend. There is no
+  configuration in which a sleeping laptop runs an 07:00 routine — which is the whole reason
+  v1 targets a cloud VM rather than a desktop daemon.
 
 ## 12. Success criteria for v1 launch
 
@@ -189,7 +265,21 @@ Hermes Agent is the closest existing system and proves the demand for self-hoste
 4. Inbox digest arrives each morning; urgent sender flagged correctly.
 5. Switching worker model mid-session is a Settings change; new workers pick it up with no restart.
 
-## 13. Open questions
+## 13. What v0.1 specified and v0.2 cut
+
+Recorded so the decisions are not silently relitigated.
+
+| Cut | Why | Where it went |
+|---|---|---|
+| Electron macOS + Android apps | Three UIs for one operator is the OpenClaw trap | One responsive web app, add-to-home-screen |
+| Six workspace persona files (`SOUL.md`, `IDENTITY.md`, `AGENTS.md`, `TOOLS.md`, `USER.md`, `HEARTBEAT.md`) | Six files to describe one bot | **Two** files per thread: `INSTRUCTIONS.md` + `MEMORY.md` (§7.7). File-backed so memory is greppable, diffable and revertable — but two files, not six |
+| Skills folders and a marketplace | An abstraction over prompts we do not need yet | Routines + per-thread instructions + `examples/instructions/` |
+| Job DAG with parent/child tasks | A dependency engine is most of a workflow product | Flat plan, ≤ 8 parallel workers, one merge |
+| `HEARTBEAT.md` | A file pretending to be a scheduler | In-process cron, persisted in SQLite |
+| Per-device keychain / age vault | Ceremony for a single-operator box | Server-side AES-GCM column, key from env |
+| Laptop-first deploy | A sleeping laptop cannot run an 07:00 routine | Cloud VM is the primary shape |
+
+## 14. Open questions
 
 - Reviewer role: ship in v1 or defer to v1.1? Default: defer; master self-checks.
 - Notification push when the tab is closed: web push vs daily email digest? Default: email digest via the operator's SMTP.
