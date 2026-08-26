@@ -1,0 +1,10 @@
+# Never enter the build context: local state, secrets, editor noise, stale output.
+.git
+.env*
+node_modules
+**/node_modules
+dist
+**/dist
+data
+qa
+.DS_Store

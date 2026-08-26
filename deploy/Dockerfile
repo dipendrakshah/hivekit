@@ -2,10 +2,19 @@
 
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
-COPY package.json pnpm-lock.yaml* ./
+# No glob on the lockfile: a missing pnpm-lock.yaml must fail right here,
+# loudly — not surface later as a confusing --frozen-lockfile error.
+COPY package.json pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
+
+# Runtime dependencies only. Dev toolchain (typescript, test runners) never
+# ships in the final image.
+FROM node:22-bookworm-slim AS deps
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile --prod
 
 FROM node:22-bookworm-slim
 WORKDIR /app
@@ -20,7 +29,7 @@ ENV NODE_ENV=production \
     HIVEKIT_CONFIG=/config/hivekit.yaml \
     HIVEKIT_DATA=/data
 
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/examples ./examples
 

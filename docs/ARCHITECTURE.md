@@ -202,13 +202,17 @@ blending a guess into a measurement.
 | `exec.run` | ask unless allowlisted |
 
 **Untrusted content reduces capability.** Anything from `web.fetch`, `rss.read` or
-`email.fetch` is tagged untrusted at ingest and the tag follows it into every prompt and
-derived artifact. A task whose context holds untrusted content has `site.push`, `x.post`,
-`email.send` and `exec.run` **removed from its tool list** — absent, not denied. So web-facing
-work is two hops: a reader worker returns structured findings with no ability to act, and the
-master acts on findings rather than on raw page text. Wrapping untrusted text in delimiters
-and telling the model not to obey it is necessary and not sufficient; this is the part that
-holds against a payload that fully convinces the model.
+`email.fetch` is tagged untrusted at ingest, and the tag travels with the text for provenance
+wherever it is quoted or rendered. Capability reduction triggers on **raw untrusted
+payloads**: a task whose context contains unmodified fetched text has `site.push`, `x.post`,
+`email.send` and `exec.run` **removed from its tool list** — absent, not denied. A reader
+worker's *findings* are a different thing: once its result passes schema validation and each
+claim carries a citation locator (§4.4.2), it is attested data, and the master — or any actor
+task fed only findings — keeps its full tool list. That boundary keeps the two-hop flow
+coherent (read raw → return attestations → act on attestations); if the tag simply propagated
+through derived artifacts it would eventually revoke everyone. Wrapping untrusted text in
+delimiters and telling the model not to obey it remains necessary but insufficient; removal
+is what holds against a payload that fully convinces the model.
 
 Every "always ask" action writes an `Approval` receipt — action, diff/payload, deciding human, model used. Receipts are browsable; this is Hivekit's audit answer to the trust gap flagged in Grok Bot coverage.
 
@@ -326,7 +330,7 @@ SQLite via `better-sqlite3`, WAL mode. Backups = copy the volume.
 1. Owner passkey → session cookie → WSS auth. No multi-tenant anything.
 2. Tools refuse paths outside the data dir. No dynamic tool creation.
 3. External sends (push/tweet/email) are structurally unable to bypass approval cards.
-4. Untrusted content is wrapped **and reduces capability** — a task holding it cannot see the external-send tools at all (§4.5). Wrapping alone is not a control.
+4. Untrusted content is wrapped **and reduces capability** — a task holding raw fetched text cannot see the external-send tools at all; attested findings do not trigger revocation (§4.5). Wrapping alone is not a control.
 5. Budget circuit breaker stops new completions past `limits.budget_usd_per_job`.
 6. Every irreversible action leaves a receipt.
 7. **Memory is data, never permission.** `MEMORY.md` is reloaded every run but cannot grant a
