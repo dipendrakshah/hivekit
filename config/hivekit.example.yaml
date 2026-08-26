@@ -1,0 +1,60 @@
+# Copy to ~/.hivekit/hivekit.yaml
+# Keys do not live here. Use `hivekit vault set openrouter` (or the UI).
+
+gateway:
+  bind: 127.0.0.1
+  port: 8787
+  expose: false          # true only behind Tailscale / TLS
+  token_env: HIVEKIT_TOKEN
+
+workspace: ~/.hivekit/workspace
+
+roles:
+  master:
+    provider: openrouter
+    model: anthropic/claude-sonnet-4.6
+    # Example upgrade: anthropic/claude-fable-5
+    fallback: openai/gpt-4.1-mini
+    temperature: 0.2
+    max_tokens: 8192
+  worker:
+    provider: openrouter
+    model: stealth/ox-alpha          # free/stealth worker; also written 0xAlpha
+    fallback: meta-llama/llama-4-maverick
+    # Example Meta "Muse-class" / Llama route lives here when the slug is known
+    temperature: 0.3
+    max_tokens: 8192
+  reviewer:
+    enabled: false
+    provider: openrouter
+    model: openai/gpt-4.1-mini
+
+limits:
+  max_workers_per_job: 8
+  max_spawn_depth: 1
+  job_timeout_minutes: 45
+  budget_usd_per_job: 2.00
+
+policy:
+  mode: ask                 # ask | auto | strict
+  exec_allowlist:
+    - "git status"
+    - "git diff"
+    - "npm test"
+  stealth_models_blocked_skills:
+    - tax-dashboard
+
+providers:
+  openrouter:
+    base_url: https://openrouter.ai/api/v1
+    vault_ref: openrouter
+  anthropic:
+    base_url: https://api.anthropic.com
+    vault_ref: anthropic
+  ollama:
+    base_url: http://127.0.0.1:11434/v1
+    vault_ref: none
+
+heartbeat:
+  enabled: true
+  file: HEARTBEAT.md
