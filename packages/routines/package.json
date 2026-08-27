@@ -1,0 +1,11 @@
+{
+  "name": "@hivekit/routines",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Routine engine (§4.6): cron state math, reboot catch-up-once-late, preflight gates, notify policies, incremental content-hash skip.",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "croner": "^9.1.0"
+  }
+}

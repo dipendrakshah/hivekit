@@ -1,14 +1,17 @@
 /**
- * @hivekit/connectors — site(git) · x(X API v2) · email(IMAP/SMTP) (stream 04).
+ * @hivekit/connectors — the three v1 connectors + web tools (§4.5, FR-K).
  *
- * Locked design (ARCHITECTURE §4.5): credentials are dereferenced inside the
- * tool executor, outside any model's view; every irreversible action produces
- * an audit receipt (who/what/when/model/approved-by).
- *
- * Stream 01 ships connector identity only — enough for Settings → Connectors
- * to enumerate what exists and for doctor to name checks that will land with
- * stream 04.
+ * One factory wires every tool into a fresh bus; executors get their secrets
+ * via injected getters so nothing credential-shaped is ever stored here.
+ * `fs.write` (repo-jailed) registers ONLY when the site connector does —
+ * the gateway composes a single bus and must never double-register.
  */
-
-export const CONNECTOR_IDS = ["site", "x", "email"] as const;
-export type ConnectorId = (typeof CONNECTOR_IDS)[number];
+export { SsrfBlocked, ssrfFetch, wrapUntrusted, wrapUntrustedExternal, isForbiddenIp } from "./web";
+export { extractFeed, makeWebTools } from "./webtools";
+export type { FeedItem } from "./webtools";
+export { SiteRepo, makeSiteTools } from "./site";
+export { makeXTools, signOAuth1 } from "./x";
+export type { XCredentials } from "./x";
+export { sendMail } from "./smtp";
+export { makeEmailTools, realImapPoller } from "./email";
+export type { MailboxPoller, FetchOne } from "./email";

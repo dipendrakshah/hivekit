@@ -2,6 +2,30 @@
 
 Goal: the three v1 connectors work end to end, and recurring jobs run unattended with approvals waiting in-thread.
 
+## Status (2026-08-27, branch `stream/4-connectors`)
+
+Implemented as standalone packages wired by the gateway at merge:
+
+- `packages/tools` — §4.5 tool bus as the only execution path: policy table
+  (allow/ask/always_ask), pure capability reduction for raw-untrusted contexts,
+  always-ask receipt enforcement bound to an exact payload hash, overrides that
+  can harden but never weaken irreversible tools.
+- `packages/connectors` — `web.fetch`/`rss.read` (SSRF guard: scheme/port/
+  credential rules, private+metadata+link-local ranges incl. v4-mapped v6,
+  manual redirect hops each re-validated, 2 MB cap; untrusted tagging at
+  ingest), `site` (clone once → branch-per-job → allow-tier commit with diff
+  preview → always-ask push verified end-to-end against real git remotes in
+  tests), `x` (OAuth 1.0a user-context signing, draft/post split over injected
+  transport), `email` (minimal SMTP client: STARTTLS/implicit-TLS, AUTH PLAIN,
+  dot-stuffing, header sanitization — plus imapflow-backed poller seam).
+- `packages/routines` — cron math via croner (tz suffix support), reboot catch-
+  up that collapses missed ticks into ONE run flagged late and never consumes a
+  slot when preflight fails, notify-policy matrix, incremental content-hash gate
+  whose changed-set directly bounds the plan width (the zero-model-call claim).
+- Untouched until full-stack integration: approval card UI rendering, NL routine
+  authoring, `hivekit doctor` connector wiring, Receipts tab. Checkbox marks wait
+  for operator-visible evidence per todo/README rules.
+
 ## Work
 
 - [ ] Tool bus + policy gate per ARCHITECTURE §4.5 (allow / ask / always-ask), wired to approval cards.
