@@ -2,8 +2,12 @@
   "name": "@hivekit/tools",
   "version": "0.1.0",
   "private": true,
+  "description": "Tool bus + policy gate per ARCHITECTURE §4.5 — allow/ask/always-ask, untrusted capability reduction, approval-receipt enforcement.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.1.13"
   }
 }

@@ -486,7 +486,9 @@ apps/web            # responsive UI (Preact + Vite), desktop + mobile layouts
 packages/protocol   # frame + schema types (zod)
 packages/models     # adapters + catalog cache
 packages/tools      # tool bus + policies
-packages/connectors # site(git) · x(X API) · email(IMAP/SMTP)
+packages/memory      # tiered MEMORY.md store: guards, retrieval, ledger (§4.8)
+packages/routines    # cron state math, catch-up-once-late, preflight, hash-skip (§4.6)
+packages/connectors # web(SSRF-guarded) · site(git) · x(X API) · email(IMAP/SMTP)
 deploy/             # docker-compose.yml, Dockerfile, Caddyfile, EC2 / Fly / Cloudflare guides
 ```
 
