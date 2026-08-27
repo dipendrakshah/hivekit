@@ -1,5 +1,27 @@
 # 03 — Models + master/worker runtime
 
+## Status (2026-08-27, branch `stream/3-models-agents`)
+
+`packages/models` COMPLETE and tested (17 tests):
+
+- types.ts attribution-required CompletionRequest (unattributed call is a compile error)
+- gateway.ts single door: probe→render→adapter→spend; retryable fallback trips on
+  429/5xx/timeout; PROBE OUTAGES degrade to a conservative rendering (text shim +
+  prepended system) instead of killing jobs — probes are infra, not product
+- render.ts capability lowering (system-role prepend is re-applied AFTER tool-shim,
+  fixing a system-leak-to-no-system-models bug found by the wire-level G9 test)
+- probe.ts six-lens capability vector, TTL-cached; json.ts tolerant parser with
+  sibling-level concatenated-object detection (topLevelSiblings runs BEFORE the
+  balance scan — sequencing bug found by corpus test) + 40-item damaged-output corpus
+- ladder.ts FR-A6 three-strike validation ladder (exact error appended verbatim →
+  tightened input/temperature → model-only fallback); attempts recorded so the
+  appended-vs-silent success gap is measured data (DoD)
+- anthropic/openai adapters over plain fetch SSE with usage-estimation flags
+
+Still open (gateway wiring, needs apps/gateway integration): master Plan schema +
+task enqueue, worker pool against JobRunner, routine preflight hooks. Tool side of
+the worker contract already exists in @hivekit/tools (stream 04).
+
 Goal: the master plans and spawns parallel workers on configurable models; spend is metered; models hot-swap.
 
 ## Work
