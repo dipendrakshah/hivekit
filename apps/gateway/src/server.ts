@@ -19,6 +19,7 @@ import type { AuthService } from "./auth";
 import { parseCookie } from "./auth";
 import { TokenRelay } from "./relay";
 import type { JobRunner } from "./jobs";
+import type { MasterRuntime } from "./runtime";
 import type { Redactor } from "./redact";
 
 const PING_INTERVAL_MS = 25_000;
@@ -30,6 +31,7 @@ export interface ServerDeps {
   db: Database;
   auth: AuthService;
   jobs: JobRunner;
+  runtime?: MasterRuntime;
   redactor: Redactor;
   publicUrl: string;
   port?: number;
@@ -208,7 +210,7 @@ export function createServer(deps: ServerDeps) {
     return relay;
   }
 
-  function handleFrame(ws: Bun.ServerWebSocket<WsData>, raw: string | Buffer): void {
+  async function handleFrame(ws: Bun.ServerWebSocket<WsData>, raw: string | Buffer): Promise<void> {
     let parsed: unknown;
     try {
       parsed = JSON.parse(typeof raw === "string" ? raw : raw.toString("utf8"));
@@ -292,8 +294,12 @@ export function createServer(deps: ServerDeps) {
           },
         });
 
-        // Echo job: the stream-01 stand-in for the master loop (stream 03).
-        jobs.startEchoJob(thread_id, body, () => makeRelay(thread_id));
+        if (deps.runtime) {
+          void deps.runtime.startJob(thread_id, body);
+        } else {
+          // Echo stand-in remains for API-only boots without model config.
+          jobs.startEchoJob(thread_id, body, () => makeRelay(thread_id));
+        }
         ws.send(JSON.stringify({ v: 1, id: frame.id, type: "res.ok", payload: {} }));
         return;
       }
@@ -301,6 +307,22 @@ export function createServer(deps: ServerDeps) {
         const { job_id, key } = data as { job_id: string; key: string };
         const ok = jobs.cancelJob(job_id, key);
         if (!ok) return sendError(ws, frame.id, "conflict", "job not cancellable");
+        ws.send(JSON.stringify({ v: 1, id: frame.id, type: "res.ok", payload: {} }));
+        return;
+      }
+      case "req.job.approve": {
+        const { approval_id } = data as { approval_id: string };
+        if (!deps.runtime) return sendError(ws, frame.id, "not_implemented", "runtime not wired");
+        const ok = await deps.runtime.approve(approval_id, "operator");
+        if (!ok) return sendError(ws, frame.id, "not_found", "approval not found or already decided");
+        ws.send(JSON.stringify({ v: 1, id: frame.id, type: "res.ok", payload: {} }));
+        return;
+      }
+      case "req.job.deny": {
+        const { approval_id } = data as { approval_id: string };
+        if (!deps.runtime) return sendError(ws, frame.id, "not_implemented", "runtime not wired");
+        const ok = await deps.runtime.deny(approval_id, "operator");
+        if (!ok) return sendError(ws, frame.id, "not_found", "approval not found or already decided");
         ws.send(JSON.stringify({ v: 1, id: frame.id, type: "res.ok", payload: {} }));
         return;
       }
@@ -359,7 +381,7 @@ export function createServer(deps: ServerDeps) {
         sockets.set(nextSocketId++, ws);
       },
       message(ws, raw) {
-        handleFrame(ws, raw);
+        void handleFrame(ws, raw);
       },
       close(ws) {
         for (const [id, s] of sockets) {
