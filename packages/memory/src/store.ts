@@ -181,7 +181,10 @@ export class MemoryStore {
   }
 
   createdRun(entryId: string): number | null {
-    const rows = this.ledger().filter((l) => l.kind === "created" && l.entry_id === entryId);
+    const rows = this.ledger().filter(
+      (l): l is Extract<LedgerRow, { kind: "created" }> =>
+        l.kind === "created" && l.entry_id === entryId,
+    );
     return rows.length ? rows.at(-1)!.run : null;
   }
 
@@ -261,10 +264,9 @@ export class MemoryStore {
           }
 
           case "promote": {
-            const candIdx = activeCandidates.findIndex((c) => c.id === op.candidate_id);
-            if (candIdx === -1)
+            const cand = activeCandidates.find((c) => c.id === op.candidate_id);
+            if (!cand)
               throw new WriteError("candidate-not-found", `candidate ${op.candidate_id} does not exist`);
-            const cand = activeCandidates[candIdx];
             const distinct = cand.seen_in_jobs.length;
             if (distinct < this.#config.promote_after) {
               throw new WriteError(
@@ -291,7 +293,7 @@ export class MemoryStore {
             // Promotion CONSUMES the candidate but retains the row: `why`
             // reads its seen_in_jobs as provenance. Operator "candidates"
             // listing hides consumed rows.
-            cand!.consumed_by = id;
+            cand.consumed_by = id;
             candidatesTouched = true;
             notes.push(`promoted ${id} after a ${ordinal(distinct)} confirmation`);
             break;
