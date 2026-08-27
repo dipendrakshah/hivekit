@@ -10,6 +10,9 @@ import { Vault } from "./vault";
 import { AuthService, SqliteAuthStore } from "./auth";
 import { Redactor } from "./redact";
 import { JobRunner } from "./jobs";
+import { MasterRuntime } from "./runtime";
+import type { Catalog } from "@hivekit/models";
+import { ThreadWorkspace } from "./workspace";
 import { createServer } from "./server";
 import { mkdirSync } from "node:fs";
 
@@ -76,10 +79,62 @@ async function main(): Promise<void> {
 
   const auth = new AuthService(new SqliteAuthStore(db), bootstrapToken);
   const jobs = new JobRunner(db, () => {}); // broadcast wired below
+
+  // --- Master runtime (stream 03). Optional: boots API-only without keys.
+  const providers = cfg.providers as Record<string, { base_url: string }>;
+  const apiKeyFor = (provider: string): string | null => {
+    const envName = `${provider.toUpperCase()}_API_KEY`;
+    return env[envName] ?? null;
+  };
+  const hasModels = Boolean(cfg.models.master && cfg.models.worker);
+  const catalog: Catalog = new Map();
+  const threadsDir = cfg.threads_dir === "/data/threads" && env.HIVEKIT_DATA
+    ? `${env.HIVEKIT_DATA}/threads`
+    : cfg.threads_dir;
+
+  let runtime: MasterRuntime | undefined;
+  if (hasModels && apiKeyFor(cfg.models.master!.provider)) {
+    runtime = new MasterRuntime({
+      db,
+      threadsDir,
+      models: {
+        master: { provider: cfg.models.master!.provider as never, model: cfg.models.master!.model, fallback: cfg.models.master!.fallback },
+        worker: { provider: cfg.models.worker!.provider as never, model: cfg.models.worker!.model, fallback: cfg.models.worker!.fallback },
+      },
+      providers,
+      apiKeyFor,
+      catalog,
+      limits: cfg.limits,
+      broadcast: () => {}, // re-wired below, same pattern as jobs
+      memoryBlockFor: (threadId) => {
+        try {
+          const slug = db.query("SELECT slug FROM threads WHERE id = ?").get(threadId) as { slug: string } | undefined;
+          if (!slug) return "";
+          const { MemoryStore, assemble, recordRetrievals } = require("@hivekit/memory") as typeof import("@hivekit/memory");
+          const store = new MemoryStore(`${threadsDir}/${slug.slug}`, cfg.memory);
+          const a = assemble(store.load(), { scope: {}, jobId: "prompt", run: 0 }, store.config());
+          recordRetrievals(store, a, { scope: {}, jobId: "prompt", run: 0 });
+          return a.promptBlock;
+        } catch { return ""; }
+      },
+      instructionsFor: (threadId) => {
+        try {
+          const slug = db.query("SELECT slug FROM threads WHERE id = ?").get(threadId) as { slug: string } | undefined;
+          if (!slug) return "";
+          return new ThreadWorkspace(threadsDir, slug.slug).readInstructions();
+        } catch { return ""; }
+      },
+      onDelta: () => {}, // re-wired below via gw.broadcast? deltas go through relay in server; keep no-op
+      fetchFn: undefined,
+    });
+    void apiKeyFor; void hasModels;
+  }
+
   const gw = createServer({
     db,
     auth,
     jobs,
+    runtime,
     redactor,
     publicUrl: cfg.server.public_url,
     port: cfg.server.port,
