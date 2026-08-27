@@ -5,7 +5,7 @@
  * Everything retrieved is recorded in the ledger against the entry.
  */
 import { allEntries } from "./mdfile";
-import type { FactEntry, LedgerRow, ParsedMemory, RuleEntry } from "./types";
+import type { FactEntry, LedgerRow, MemOp, ParsedMemory, RuleEntry } from "./types";
 
 /** Parse a scope expression like `source=example.dev connector=feed` into a map. */
 export function parseScope(expr: string): Record<string, string> {

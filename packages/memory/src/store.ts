@@ -159,9 +159,11 @@ export class MemoryStore {
       cand?.seen_in_jobs.forEach((j) => jobs.add(j));
     }
     for (const l of this.ledger()) {
-      if (l.kind !== "retrieval" && "job_id" in l && l.entry_id === entryId && l.job_id)
+      // Lifecycle rows carry both entry_id and job_id.
+      if ((l.kind === "created" || l.kind === "promoted") && l.entry_id === entryId)
         jobs.add(l.job_id);
-      if (l.kind === "superseded" && "replaced_by" in l && l.replaced_by === entryId)
+      // An entry born from a supersede also inherits its predecessor's origin.
+      if (l.kind === "promoted" && l.candidate_id === entryId)
         jobs.add(l.job_id);
     }
     return [...jobs];
@@ -170,7 +172,8 @@ export class MemoryStore {
   /** Which jobs USED an entry (retrieved into a prompt), newest run last. */
   jobsThatUsed(entryId: string): Array<{ run: number; job_id: string }> {
     return this.ledger()
-      .filter((l) => l.kind === "retrieval" && l.entry_id === entryId)
+      .filter((l): l is Extract<LedgerRow, { kind: "retrieval" }> =>
+        l.kind === "retrieval" && l.entry_id === entryId)
       .map((l) => ({ run: l.run, job_id: l.job_id }))
       .sort((a, b) => a.run - b.run);
   }

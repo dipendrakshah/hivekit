@@ -21,8 +21,9 @@ export function runMemoryCli(argv: string[], threadsDir: string, config?: Partia
         .filter((s) => statSync(join(threadsDir, s)).isDirectory() && !s.startsWith("."))
         .map((s) => ({ s, m: statSync(join(threadsDir, s)).mtimeMs }))
         .sort((a, b) => b.m - a.m);
-      if (!slugs.length) throw new Error(`no thread workspaces under ${threadsDir}`);
-      return { slug: slugs[0].s, store: new MemoryStore(join(threadsDir, slugs[0].s), config) };
+      const newest = slugs[0];
+      if (!newest) throw new Error(`no thread workspaces under ${threadsDir}`);
+      return { slug: newest.s, store: new MemoryStore(join(threadsDir, newest.s), config) };
     }
     return { slug, store: new MemoryStore(join(threadsDir, slug), config) };
   }
@@ -80,7 +81,7 @@ export function runMemoryCli(argv: string[], threadsDir: string, config?: Partia
     case "retire": {
       const id = rest.find((a) => /^[prf]\d+$/.test(a));
       const reasonIdx = rest.indexOf("--reason");
-      const reason = reasonIdx >= 0 ? rest[reasonIdx + 1] : "retired by operator";
+      const reason = (reasonIdx >= 0 ? rest[reasonIdx + 1] : undefined) ?? "retired by operator";
       if (!id) return "usage: hivekit memory retire <id> [--reason ...]";
       const { store } = storeFor(undefined);
       return store.retireByOperator(id, reason, "operator")

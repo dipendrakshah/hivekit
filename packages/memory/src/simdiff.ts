@@ -75,34 +75,40 @@ export function diffLines(before: string, after: string): DiffRow[] {
     // Pathological input; degrade to replace-block rather than hang.
     return [
       ...a.slice(0, start).map((t) => ({ kind: "ctx", text: t }) as DiffRow),
-      ...midA.map((t) => ({ kind: "del", text: t }) as DiffRow),
-      ...midB.map((t) => ({ kind: "add", text: t }) as DiffRow),
+      ...midA.map((t) => ({ kind: "del", text: t ?? "" }) as DiffRow),
+      ...midB.map((t) => ({ kind: "add", text: t ?? "" }) as DiffRow),
       ...a.slice(endA + 1).map((t) => ({ kind: "ctx", text: t }) as DiffRow),
     ];
   }
 
   const dp: Uint32Array[] = Array.from({ length: midA.length + 1 }, () => new Uint32Array(midB.length + 1));
-  for (let i = midA.length - 1; i >= 0; i--)
+  for (let i = midA.length - 1; i >= 0; i--) {
+    const rowI = dp[i]!;
+    const rowBelow = dp[i + 1]!;
     for (let j = midB.length - 1; j >= 0; j--)
-      dp[i][j] = midA[i] === midB[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      rowI[j] =
+        (midA[i] ?? "") === (midB[j] ?? "")
+          ? (rowBelow[j + 1] ?? 0) + 1
+          : Math.max(rowBelow[j] ?? 0, rowI[j + 1] ?? 0);
+  }
 
   const rows: DiffRow[] = [];
-  for (let k = 0; k < start; k++) rows.push({ kind: "ctx", text: a[k] });
+  for (let k = 0; k < start; k++) rows.push({ kind: "ctx", text: a[k] ?? "" });
   let i = 0;
   let j = 0;
   while (i < midA.length && j < midB.length) {
     if (midA[i] === midB[j]) {
-      rows.push({ kind: "ctx", text: midA[i] });
-      i++; j++;
-    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-      rows.push({ kind: "del", text: midA[i++] });
+      rows.push({ kind: "ctx", text: midA[i++] ?? "" });
+      j++;
+    } else if ((dp[i + 1]?.[j] ?? 0) >= (dp[i]?.[j + 1] ?? 0)) {
+      rows.push({ kind: "del", text: midA[i++] ?? "" });
     } else {
-      rows.push({ kind: "add", text: midB[j++] });
+      rows.push({ kind: "add", text: midB[j++] ?? "" });
     }
   }
-  while (i < midA.length) rows.push({ kind: "del", text: midA[i++] });
-  while (j < midB.length) rows.push({ kind: "add", text: midB[j++] });
-  for (let k = endA + 1; k < n; k++) rows.push({ kind: "ctx", text: a[k] });
+  while (i < midA.length) rows.push({ kind: "del", text: midA[i++] ?? "" });
+  while (j < midB.length) rows.push({ kind: "add", text: midB[j++] ?? "" });
+  for (let k = endA + 1; k < n; k++) rows.push({ kind: "ctx", text: a[k] ?? "" });
   return rows;
 }
 

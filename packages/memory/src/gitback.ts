@@ -63,7 +63,7 @@ export class GitBacking {
         .split("\n")
         .filter(Boolean)
         .map((line) => {
-          const [hash, at, message] = line.split("\x1f");
+          const [hash = "", at = "", message = ""] = line.split("\x1f");
           return { hash, at, message };
         });
     } catch {

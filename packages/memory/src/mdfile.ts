@@ -70,7 +70,7 @@ export function parseMemory(raw: string): ParsedMemory {
     // --- entry bullet: `- [r7] text ·when ...` (metadata may ride inline)
     const m = ENTRY_LINE.exec(line);
     if (m?.groups && section) {
-      const rest = m.groups.rest.trim();
+      const rest = m.groups.rest ?? "";
       const id = `${m.groups.prefix}${m.groups.num}`;
       const dotAt = rest.indexOf("·");
       const text = (dotAt === -1 ? rest : rest.slice(0, dotAt)).trim();
