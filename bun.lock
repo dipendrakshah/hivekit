@@ -37,6 +37,10 @@
       "name": "@hivekit/connectors",
       "version": "0.1.0",
     },
+    "packages/memory": {
+      "name": "@hivekit/memory",
+      "version": "0.1.0",
+    },
     "packages/models": {
       "name": "@hivekit/models",
       "version": "0.1.0",
@@ -151,6 +155,8 @@
     "@hivekit/connectors": ["@hivekit/connectors@workspace:packages/connectors"],
 
     "@hivekit/gateway": ["@hivekit/gateway@workspace:apps/gateway"],
+
+    "@hivekit/memory": ["@hivekit/memory@workspace:packages/memory"],
 
     "@hivekit/models": ["@hivekit/models@workspace:packages/models"],
 

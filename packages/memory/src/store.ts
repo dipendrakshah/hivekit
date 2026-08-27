@@ -291,7 +291,7 @@ export class MemoryStore {
             // Promotion CONSUMES the candidate but retains the row: `why`
             // reads its seen_in_jobs as provenance. Operator "candidates"
             // listing hides consumed rows.
-            cand.consumed_by = id;
+            cand!.consumed_by = id;
             candidatesTouched = true;
             notes.push(`promoted ${id} after a ${ordinal(distinct)} confirmation`);
             break;
@@ -439,8 +439,13 @@ function removeFromDraft(mem: ParsedMemory, entry: Entry): void {
 }
 
 function pushIntoDraft(mem: ParsedMemory, entry: Entry): void {
-  if (entry.tier === "rules") mem.rules.push(entry);
-  else mem.facts.push(entry);
+  if (entry.tier === "rules") {
+    mem.rules.push(entry);
+  } else if (entry.tier === "facts") {
+    mem.facts.push(entry);
+  } else {
+    throw new Error("pushIntoDraft: pinned entries enter only via pin()");
+  }
 }
 
 /** Fresh entry built from a supersede op; guard-validated BEFORE this is called. */
