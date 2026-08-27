@@ -1,0 +1,27 @@
+{
+  "name": "hivekit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Your own Grok Bot. On your VM. Your models.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:gateway": "bun --watch apps/gateway/src/main.ts",
+    "dev:web": "bun --cwd apps/web vite",
+    "build": "bun run build:web && bun run build:gateway",
+    "build:web": "bun --cwd apps/web vite build --outDir ../../dist/web --emptyOutDir",
+    "build:gateway": "bun build apps/gateway/src/main.ts --target=bun --outfile=dist/main.js",
+    "start": "bun dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json",
+    "test": "bun test",
+    "doctor": "bun apps/gateway/src/doctor.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.23",
+    "typescript": "^5.9.3"
+  }
+}

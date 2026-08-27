@@ -1,0 +1,17 @@
+{
+  "name": "@hivekit/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@hivekit/connectors": "workspace:*",
+    "@hivekit/models": "workspace:*",
+    "@hivekit/protocol": "workspace:*",
+    "@hivekit/tools": "workspace:*",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.13"
+  }
+}
