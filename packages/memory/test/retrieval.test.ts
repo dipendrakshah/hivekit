@@ -37,7 +37,8 @@ describe("scope matching", () => {
 });
 
 describe("DoD: prompt size is flat in memory size", () => {
-  test("a thread with 400+ entries and one with a handful produce prompts within 10%", () => {
+  test("a thread with 400+ entries and one with a handful produce prompts within 10%",
+    () => {
     // Caps do the work: rules_top_k(8) + facts_top_n(4) bound the block size,
     // so retrieval volume — and therefore prompt bytes — cannot grow with memory.
     const small = new MemoryStore(join(dir, "small"), { rules_top_k: 8, facts_top_n: 4 });
@@ -57,7 +58,8 @@ describe("DoD: prompt size is flat in memory size", () => {
     // both retrieved exactly the cap (8 rules; no facts seeded)
     expect(aSmall.retrieved.length).toBe(8);
     expect(aBig.retrieved.length).toBe(8);
-  });
+  },
+  30_000); // heavy fsync fixture; Bun default 5s is too tight under full-suite load
 
   test("scope miss yields nothing beyond pinned/state", () => {
     const s = new MemoryStore(join(dir, "miss"), {});
