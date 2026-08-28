@@ -1,0 +1,12 @@
+{
+  "name": "Hivekit",
+  "short_name": "Hivekit",
+  "description": "Your own Grok Bot. On your VM. Your models.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12110e",
+  "theme_color": "#12110e",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

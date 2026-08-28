@@ -34,11 +34,14 @@ const TERMINAL = new Set(["done", "failed", "cancelled"]);
 
 export class JobRunner {
   #timers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Set via setBroadcaster after the server exists — no cast-hacks. */
+  #broadcast: (event: string, payload: unknown) => void = () => {};
 
-  constructor(
-    private readonly db: Database,
-    private readonly broadcast: (event: string, payload: unknown) => void,
-  ) {}
+  constructor(private readonly db: Database) {}
+
+  setBroadcaster(fn: (event: string, payload: unknown) => void): void {
+    this.#broadcast = fn;
+  }
 
   /** Create + start an echo job. Persist-then-act at every step. */
   startEchoJob(threadId: string, prompt: string, relayFactory: (jobId: string) => TokenRelay): string {
@@ -83,7 +86,7 @@ export class JobRunner {
     this.db
       .query("UPDATE jobs SET status = 'done', finished_at = ? WHERE id = ?")
       .run(new Date().toISOString(), jobId);
-    this.broadcast("event.job", { job: this.getJob(jobId) });
+    this.#broadcast("event.job", { job: this.getJob(jobId) });
   }
 
   /** Journal first, then state. The only legal order. */
@@ -146,7 +149,7 @@ export class JobRunner {
       .run(new Date().toISOString(), jobId);
     const timer = this.#timers.get(`${jobId}:emit`);
     if (timer) clearTimeout(timer);
-    this.broadcast("event.job", { job: this.getJob(jobId) });
+    this.#broadcast("event.job", { job: this.getJob(jobId) });
     return true;
   }
 }
