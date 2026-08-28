@@ -11,6 +11,7 @@ import { AuthService, SqliteAuthStore } from "./auth";
 import { Redactor } from "./redact";
 import { JobRunner } from "./jobs";
 import { MasterRuntime } from "./runtime";
+import { compilePolicy } from "./policy";
 import type { Catalog } from "@hivekit/models";
 import { ThreadWorkspace } from "./workspace";
 import { createServer } from "./server";
@@ -105,6 +106,11 @@ async function main(): Promise<void> {
       apiKeyFor,
       catalog,
       limits: cfg.limits,
+      policyOverrides: compilePolicy({
+        mode: cfg.policy.mode,
+        always_ask: cfg.policy.always_ask,
+        exec_allowlist: cfg.policy.exec_allowlist,
+      }).overrides,
       broadcast: () => {}, // re-wired below, same pattern as jobs
       memoryBlockFor: (threadId) => {
         try {

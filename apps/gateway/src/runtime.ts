@@ -48,6 +48,8 @@ export interface RuntimeDeps {
   fetchFn?: typeof fetch;
   /** Test/diagnostic hook: register EXTRA tools on every job bus (e.g. gated fakes). */
   extraTools?: (bus: ToolBus) => void;
+  /** Compiled policy-mode overrides (ask/auto/strict) applied to every job bus. */
+  policyOverrides?: Partial<Record<import("@hivekit/tools").ToolName, import("@hivekit/tools").Policy>>;
   /** Pre-seeded capability cache (tests inject ALL_CAPABLE; prod probes fresh). */
   capabilities?: Map<string, import("@hivekit/models").ProbeRecord>;
 }
@@ -291,6 +293,7 @@ export class MasterRuntime {
     const existing = this.#buses.get(jobId);
     if (existing) return existing;
     const bus = new ToolBus({
+      overrides: this.deps.policyOverrides,
       verifyReceipt: async (ref) => {
         const row = this.deps.db
           .query("SELECT status, payload_json FROM approvals WHERE id = ?")

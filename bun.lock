@@ -17,6 +17,7 @@
         "@hivekit/memory": "workspace:*",
         "@hivekit/models": "workspace:*",
         "@hivekit/protocol": "workspace:*",
+        "@hivekit/routines": "workspace:*",
         "@hivekit/tools": "workspace:*",
         "yaml": "^2.8.1",
         "zod": "^4.1.13",

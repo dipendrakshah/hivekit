@@ -222,3 +222,29 @@ Migrations run on boot and take a database backup first. Pin an image tag in pro
   was ambiguous — better then than at 07:00 unattended.
 - `docker compose exec hivekit hivekit doctor` checks config, vault, provider ping per
   configured model, connector auth, disk and TLS expiry.
+
+
+## Backup & restore (the drill, ≤20 minutes on a second VM)
+
+Everything that matters is one Docker volume (`hivekit_data`): SQLite (threads,
+jobs, approvals, spend, routines) **and** `/data/threads` (INSTRUCTIONS.md,
+MEMORY.md, artifacts). The DB is WAL — copy both files (`hivekit.db`,
+`hivekit.db-wal`, `hivekit.db-shm`) or use `sqlite3 hivekit.db ".backup '/tmp/backup.db'"`
+for a consistent single file.
+
+1. On VM-A: `docker exec hivekit-hivekit-1 sqlite3 /data/hivekit.db ".backup '/data/backup.db'"`
+2. Snapshot/copy the whole volume (`docker run --rm -v hivekit-data:/data -v $PWD:/b alpine tar czf /b/hivekit-data.tgz /data`).
+3. On VM-B: `docker volume create hivekit_data`, untar into it, point DNS (or Caddy `HIVE_HOST`) at VM-B, `docker compose up -d`.
+4. Verify: passkey login works (sessions table restored), thread history renders,
+   `hivekit memory show` lists rules, approvals show receipts. Migrations on boot
+   are idempotent — restoring an OLDER release's volume and starting a NEWER image
+   is the supported upgrade path.
+
+## Upgrade path
+
+- Pin image tags (build with `docker build -t ghcr.io/you/hivekit:1.0.0 .`) — never `latest` in compose.
+- Boot runs `schema_migrations` (additive, versioned, transactional). Downgrade:
+  read the changelog for the version you're stepping back to; additive migrations
+  are harmless to older images (extra tables/columns are ignored).
+- Secrets (`HIVEKIT_TOKEN`, `HIVEKIT_MASTER_KEY`) never rotate casually: the vault
+  key decrypts every stored credential. Rotate = re-enter connector credentials.
