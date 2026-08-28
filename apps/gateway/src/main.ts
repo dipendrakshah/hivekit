@@ -78,7 +78,7 @@ async function main(): Promise<void> {
   );
 
   const auth = new AuthService(new SqliteAuthStore(db), bootstrapToken);
-  const jobs = new JobRunner(db, () => {}); // broadcast wired below
+  const jobs = new JobRunner(db);
 
   // --- Master runtime (stream 03). Optional: boots API-only without keys.
   const providers = cfg.providers as Record<string, { base_url: string }>;
@@ -141,9 +141,8 @@ async function main(): Promise<void> {
     webRoot: env.HIVEKIT_WEB_ROOT,
   });
 
-  // Re-wire job broadcasts to the live socket set.
-  (jobs as unknown as { broadcast: (e: string, p: unknown) => void }).broadcast =
-    gw.broadcast;
+  // Broadcast to the live socket set — set explicitly, no private-field cast.
+  jobs.setBroadcaster(gw.broadcast);
 
   const recovered = jobs.recoverOnBoot();
   if (recovered.resumed > 0) {
