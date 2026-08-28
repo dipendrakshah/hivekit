@@ -270,3 +270,61 @@ describe("loop guard", () => {
     expect(JSON.stringify(h.calls)).toContain("you already did that");
   });
 });
+
+describe("provider resolution: Z.ai GLM", () => {
+  test("model {provider:zai, id:glm-5.3-flash} hits the Z.ai endpoint with Bearer key", async () => {
+    const seen: Array<{ url: string; auth: string; model: string }> = [];
+    const h = scriptedDeps([() => sseResponse("[]")]);
+    // Replace transport AFTER deps built: assert real request shape.
+    let capture: ((body: Record<string, unknown>, init?: RequestInit) => Response) | null = null;
+    (h.deps as { fetchFn?: typeof fetch }).fetchFn = (async (url: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      seen.push({
+        url: String(url),
+        auth: String((init?.headers as Record<string, string>).authorization),
+        model: body.model as string,
+      });
+      return (
+        capture?.(body, init) ??
+        sseResponse([JSON.stringify({ choices: [{ delta: { content: '{"status":"ok"}' } }] })])
+      );
+    }) as typeof fetch;
+    h.deps.providers = { zai: { base_url: "https://api.z.ai/api/paas/v4" } };
+    h.deps.capabilities = new Map([
+      ["glm-5.3-flash", { modelId: "glm-5.3-flash", vector: { ...ALL_CAPABLE }, at: Date.now() }],
+    ] as Array<[string, ProbeRecord]>);
+    h.deps.models = {
+      master: { provider: "zai", model: "glm-5.3-flash" },
+      worker: { provider: "zai", model: "glm-5.3-flash" },
+    };
+    h.deps.apiKeyFor = () => "sk-zai-test-key";
+
+    const PLAN = {
+      intent: "say hello back",
+      tasks: [{ title: "greet", objective: "reply to operator", kind: "actor", success: "greeting delivered." }],
+    };
+    capture = (body) => {
+      if ("response_format" in body)
+        return sseResponse([JSON.stringify({ choices: [{ delta: { content: JSON.stringify(PLAN) } }] })]);
+      return sseResponse([
+        JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ status: "ok", findings: [], artifacts: [], notes: "hi", blockers: [], success_claimed: true }) } }] }),
+      ]);
+    };
+
+    const rt = new MasterRuntime(h.deps);
+    const id = await rt.startJob("thread-1", "hello");
+    const st = (rt.getJob(id) as { status: string }).status;
+    if (st !== "done") {
+      console.error("TASKS:", JSON.stringify(h.db.query("SELECT status,error FROM tasks WHERE job_id=?", []).all(id)));
+      console.error("MSGS:", JSON.stringify(h.db.query("SELECT body FROM messages WHERE role='system'").all()).slice(0, 300));
+    }
+    expect(st).toBe("done");
+
+    expect(seen.length).toBeGreaterThanOrEqual(2);
+    for (const s of seen) {
+      expect(s.url).toBe("https://api.z.ai/api/paas/v4/chat/completions");
+      expect(s.auth).toBe("Bearer sk-zai-test-key");
+      expect(s.model).toBe("glm-5.3-flash");
+    }
+  });
+});

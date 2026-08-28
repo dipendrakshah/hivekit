@@ -85,7 +85,9 @@ async function main(): Promise<void> {
   const providers = cfg.providers as Record<string, { base_url: string }>;
   const apiKeyFor = (provider: string): string | null => {
     const envName = `${provider.toUpperCase()}_API_KEY`;
-    return env[envName] ?? null;
+    // "zai" is the configured provider name for Z.ai; accept both spellings.
+    const aliases: Record<string, string> = { Z_AI_API_KEY: "ZAI_API_KEY", GLM_API_KEY: "ZAI_API_KEY" };
+    return env[envName] ?? (aliases[envName] ? env[aliases[envName]] : null) ?? null;
   };
   const hasModels = Boolean(cfg.models.master && cfg.models.worker);
   const catalog: Catalog = new Map();
