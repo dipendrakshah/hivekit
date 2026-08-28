@@ -92,6 +92,7 @@ export function planSystemPrompt(deps: PlannerDeps): string {
     "- kind=reader tasks FETCH sources and return findings; kind=actor tasks consume findings.",
     "- Every task's `success` must be a checkable sentence about its OUTPUT, not its effort.",
     "- Web-facing work is two hops: reader tasks hold raw page text (no send tools); actor tasks act only on findings.",
+    '- Conversational asks (greetings, questions, "reply with X") need ONE actor task — do not invent reader/fetch tasks when no sources are named.',
     "- Never more than 8 tasks. Do not plan tool calls you have not been granted.",
   ].join("\n");
 }

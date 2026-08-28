@@ -90,26 +90,59 @@ async function main(): Promise<void> {
     const aliases: Record<string, string> = { Z_AI_API_KEY: "ZAI_API_KEY", GLM_API_KEY: "ZAI_API_KEY" };
     return env[envName] ?? (aliases[envName] ? env[aliases[envName]] : null) ?? null;
   };
-  const hasModels = Boolean(cfg.models.master && cfg.models.worker);
+  // Zero-config boot: no models in the config file? Derive them from whichever
+  // provider key exists in the environment. One key = a thinking hive.
+  const envModels = (() => {
+    if (cfg.models.master || cfg.models.worker) return null;
+    const candidates: Array<{ provider: string; model: string }> = [
+      { provider: "zai", model: "glm-5.3-flash" },
+      { provider: "openrouter", model: "openrouter/auto" },
+      { provider: "anthropic", model: "claude-sonnet-4-5" },
+    ];
+    const first = candidates.find((c) => apiKeyFor(c.provider));
+    if (!first) return null;
+    // The base_url map comes from config; with no config file, synthesize the
+    // registry entry for whichever provider we just derived models from.
+    const KNOWN_BASE: Record<string, string> = {
+      zai: "https://api.z.ai/api/paas/v4",
+      openrouter: "https://openrouter.ai/api/v1",
+      anthropic: "https://api.anthropic.com/v1",
+    };
+    providers[first.provider] = { base_url: KNOWN_BASE[first.provider]! };
+    console.log(`[boot] no models in config — deriving master+worker from ${first.provider} key`);
+    const withFallback = { ...first, fallback: undefined as string | undefined };
+    return { master: withFallback, worker: withFallback };
+  })();
+
+  // One-key boot: if the master's provider has no key but the worker's does,
+  // the master runs on the worker's provider — a hive with one key still thinks.
+  const masterCfg = cfg.models.master ?? envModels?.master;
+  const workerCfg = cfg.models.worker ?? envModels?.worker;
+  const masterKey = masterCfg ? apiKeyFor(masterCfg.provider) : null;
+  const workerKey = workerCfg ? apiKeyFor(workerCfg.provider) : null;
+  const effectiveMaster = masterCfg && masterKey ? masterCfg : workerCfg;
+  if (effectiveMaster !== masterCfg && effectiveMaster)
+    console.log("[boot] no key for master provider — master riding the worker's provider");
+  const hasModels = Boolean(effectiveMaster && workerCfg && (masterKey || workerKey));
   const catalog: Catalog = new Map();
   const threadsDir = cfg.threads_dir === "/data/threads" && env.HIVEKIT_DATA
     ? `${env.HIVEKIT_DATA}/threads`
     : cfg.threads_dir;
 
   let runtime: MasterRuntime | undefined;
-  if (hasModels && apiKeyFor(cfg.models.master!.provider)) {
+  if (hasModels) {
     runtime = new MasterRuntime({
       db,
       threadsDir,
       models: {
-        master: { provider: cfg.models.master!.provider as never, model: cfg.models.master!.model, fallback: cfg.models.master!.fallback },
-        worker: { provider: cfg.models.worker!.provider as never, model: cfg.models.worker!.model, fallback: cfg.models.worker!.fallback },
+        master: { provider: effectiveMaster!.provider as never, model: effectiveMaster!.model, fallback: effectiveMaster!.fallback },
+        worker: { provider: workerCfg!.provider as never, model: workerCfg!.model, fallback: workerCfg!.fallback },
       },
       providers,
       apiKeyFor,
       catalog,
       limits: cfg.limits,
-      capabilityTtlMs: cfg.capability_probe_ttl_days * 86_400_000,
+      capabilityTtlMs: (cfg.capability_probe_ttl_days ?? 14) * 86_400_000,
       policyOverrides: compilePolicy({
         mode: cfg.policy.mode,
         always_ask: cfg.policy.always_ask,
