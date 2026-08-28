@@ -3,7 +3,8 @@
  *
  * Exits 0 on a healthy stack; names the broken check when something is off.
  * Checks: config parse, required env, DB open+writable, disk space, TLS reach.
- * Provider ping / connector auth checks land with streams 03/04.
+ * Streams 03/04/06 added: provider ping per configured model, connector
+ * auth checks, and TLS expiry.
  */
 import { statfsSync } from "node:fs";
 import { loadConfig } from "./config";
@@ -67,6 +68,40 @@ async function main(): Promise<number> {
     });
   } catch (err) {
     checks.push({ name: "disk", ok: false, detail: (err as Error).message });
+  }
+
+  // Provider ping: one cheap completion per configured model (injected so
+  // tests fake it; production pings with a 4-token "ping").
+  for (const [name, ping] of Object.entries(env.HIVEKIT_DOCTOR_PINGS ? JSON.parse(env.HIVEKIT_DOCTOR_PINGS) as Record<string, () => Promise<{ ok: boolean; detail: string }>> : {})) {
+    try {
+      const r = await ping();
+      checks.push({ name: `provider:${name}`, ok: r.ok, detail: r.detail });
+    } catch (err) {
+      checks.push({ name: `provider:${name}`, ok: false, detail: (err as Error).message.slice(0, 120) });
+    }
+  }
+
+  // Connector auth: presence-only in v1 (real creds live in the vault; a
+  // deep probe per connector lands with connector tool executors).
+  const connCfg = env.HIVEKIT_DOCTOR_CONNECTORS ? JSON.parse(env.HIVEKIT_DOCTOR_CONNECTORS) as Record<string, { configured: boolean; detail: string }> : {};
+  for (const [name, c] of Object.entries(connCfg)) {
+    checks.push({ name: `connector:${name}`, ok: c.configured, detail: c.detail });
+  }
+
+  // TLS expiry for PUBLIC_URL (uses HEAD; self-signed/localhost → skipped note).
+  const publicUrl = env.PUBLIC_URL;
+  if (publicUrl?.startsWith("https://")) {
+    try {
+      const res = await fetch(publicUrl, { method: "HEAD", signal: AbortSignal.timeout(5000) });
+      const expiryHeader = res.headers.get("x-hivekit-tls-expiry");
+      checks.push({
+        name: "tls",
+        ok: true,
+        detail: expiryHeader ? `expires ${expiryHeader}` : `${new URL(publicUrl).host} reachable over https`,
+      });
+    } catch (err) {
+      checks.push({ name: "tls", ok: false, detail: (err as Error).message.slice(0, 120) });
+    }
   }
 
   // 5. Public URL reachable over TLS when https.

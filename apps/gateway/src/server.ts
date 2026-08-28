@@ -338,6 +338,22 @@ export function createServer(deps: ServerDeps) {
     fetch(req, server) {
       const url = new URL(req.url);
 
+      // CSRF defense-in-depth (cookies are SameSite=Strict already): any
+      // state-changing REST call with cross-site signals is refused. Absent
+      // headers (curl, same-origin fetch) pass.
+      if (req.method === "POST" && url.pathname.startsWith("/api/")) {
+        const site = req.headers.get("sec-fetch-site");
+        const origin = req.headers.get("origin");
+        if (site === "cross-site") return new Response("cross-site refused", { status: 403 });
+        if (origin) {
+          try {
+            if (new URL(origin).host !== url.host) return new Response("cross-origin refused", { status: 403 });
+          } catch {
+            return new Response("bad origin", { status: 403 });
+          }
+        }
+      }
+
       if (url.pathname === "/healthz") {
         return new Response("ok", { headers: { "content-type": "text/plain" } });
       }
@@ -360,6 +376,17 @@ export function createServer(deps: ServerDeps) {
 
       // ---- WebSocket upgrade (session cookie or ?token= for non-browser clients)
       if (url.pathname === "/ws") {
+        // WSS origin check: browsers always send Origin on upgrade; a hostile
+        // page driving its own WS client is refused. Non-browser clients
+        // (no Origin) proceed to token auth.
+        const wsOrigin = req.headers.get("origin");
+        if (wsOrigin) {
+          try {
+            if (new URL(wsOrigin).host !== url.host) return new Response("cross-origin ws refused", { status: 403 });
+          } catch {
+            return new Response("bad origin", { status: 403 });
+          }
+        }
         const token = parseCookie(req.headers.get("cookie")) ?? url.searchParams.get("token");
         if (!token || !auth.validateSession(token)) {
           return new Response("unauthorized", { status: 401 });
