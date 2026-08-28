@@ -15,7 +15,8 @@ import { compilePolicy } from "./policy";
 import type { Catalog } from "@hivekit/models";
 import { ThreadWorkspace } from "./workspace";
 import { createServer } from "./server";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 function fail(message: string): never {
   console.error(`hivekit: ${message}`);
@@ -147,7 +148,13 @@ async function main(): Promise<void> {
     redactor,
     publicUrl: cfg.server.public_url,
     port: cfg.server.port,
-    webRoot: env.HIVEKIT_WEB_ROOT,
+    // Serve the built UI by default (container: /app/dist/web). An explicit
+    // HIVEKIT_WEB_ROOT overrides; missing dir → API-only, same as before.
+    webRoot:
+      env.HIVEKIT_WEB_ROOT ??
+      (existsSync(join(dirname(import.meta.path), "web", "index.html"))
+        ? join(dirname(import.meta.path), "web")
+        : undefined),
   });
 
   // Broadcast to the live socket set — set explicitly, no private-field cast.
