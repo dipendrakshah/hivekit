@@ -53,6 +53,7 @@ export interface HivekitConfig {
     untrusted_revokes: string[];
   };
   providers: Record<string, { base_url: string }>;
+  capability_probe_ttl_days: number;
   connectors: {
     site?: { repo?: string; branch?: string; method?: string };
     x?: { handle?: string };
@@ -93,6 +94,7 @@ const DEFAULTS: HivekitConfig = {
     untrusted_revokes: ["site.push", "x.post", "email.send", "exec.run"],
   },
   providers: {},
+  capability_probe_ttl_days: 14,
   connectors: {},
   routines_seed: [],
 };
@@ -106,6 +108,7 @@ const KNOWN_TOP = new Set([
   "limits",
   "policy",
   "providers",
+  "capability_probe_ttl_days",
   "connectors",
   "routines_seed",
 ]);
@@ -140,6 +143,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HivekitConfig 
     limits: { ...DEFAULTS.limits, ...(fileConfig.limits ?? {}) },
     policy: { ...DEFAULTS.policy, ...(fileConfig.policy ?? {}) },
     providers: { ...DEFAULTS.providers, ...(fileConfig.providers ?? {}) },
+    capability_probe_ttl_days: fileConfig.capability_probe_ttl_days ?? 14,
     connectors: { ...DEFAULTS.connectors, ...(fileConfig.connectors ?? {}) },
     routines_seed: fileConfig.routines_seed ?? [],
   };

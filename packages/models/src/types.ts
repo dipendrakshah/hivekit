@@ -19,7 +19,8 @@ export interface CallAttribution {
 
 export type ProviderId =
   | "openai_compat" // OpenRouter, Groq, Together, Fireworks, Ollama, custom base URLs
-  | "anthropic";
+  | "anthropic"
+  | "zai"; // Z.ai GLM — OpenAI-compatible (adapter dispatch falls through to openai_compat)
 // Google optional later — deliberately absent until a PRD asks for it.
 
 export interface ModelRef {

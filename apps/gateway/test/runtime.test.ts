@@ -274,7 +274,7 @@ describe("loop guard", () => {
 describe("provider resolution: Z.ai GLM", () => {
   test("model {provider:zai, id:glm-5.3-flash} hits the Z.ai endpoint with Bearer key", async () => {
     const seen: Array<{ url: string; auth: string; model: string }> = [];
-    const h = scriptedDeps([() => sseResponse("[]")]);
+    const h = scriptedDeps([() => sseResponse([JSON.stringify({ choices: [{ delta: { content: "{}" } }] })])]);
     // Replace transport AFTER deps built: assert real request shape.
     let capture: ((body: Record<string, unknown>, init?: RequestInit) => Response) | null = null;
     (h.deps as { fetchFn?: typeof fetch }).fetchFn = (async (url: unknown, init?: RequestInit) => {
@@ -296,7 +296,7 @@ describe("provider resolution: Z.ai GLM", () => {
     h.deps.models = {
       master: { provider: "zai", model: "glm-5.3-flash" },
       worker: { provider: "zai", model: "glm-5.3-flash" },
-    };
+    } as RuntimeDeps["models"];
     h.deps.apiKeyFor = () => "sk-zai-test-key";
 
     const PLAN = {
@@ -314,10 +314,6 @@ describe("provider resolution: Z.ai GLM", () => {
     const rt = new MasterRuntime(h.deps);
     const id = await rt.startJob("thread-1", "hello");
     const st = (rt.getJob(id) as { status: string }).status;
-    if (st !== "done") {
-      console.error("TASKS:", JSON.stringify(h.db.query("SELECT status,error FROM tasks WHERE job_id=?", []).all(id)));
-      console.error("MSGS:", JSON.stringify(h.db.query("SELECT body FROM messages WHERE role='system'").all()).slice(0, 300));
-    }
     expect(st).toBe("done");
 
     expect(seen.length).toBeGreaterThanOrEqual(2);

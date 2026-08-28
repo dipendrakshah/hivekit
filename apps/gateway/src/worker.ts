@@ -34,9 +34,9 @@ export interface TaskContext {
   instructions: string;
   memoryBlock: string;
   findings: WorkerFinding[];
-  model: { provider: "openai_compat" | "anthropic"; id: string };
+  model: { provider: import("@hivekit/models").ProviderId; id: string };
   /** May return null when no fallback configured — ladder then uses 2 arms. */
-  fallbackModel: () => { provider: "openai_compat" | "anthropic"; id: string } | null;
+  fallbackModel: () => { provider: import("@hivekit/models").ProviderId; id: string } | null;
   complete: (req: CompletionRequest) => Promise<{ text: string }>;
   /** Bus pre-registered with THIS job's allowed tools. */
   bus: ToolBus;

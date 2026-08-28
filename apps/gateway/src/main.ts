@@ -108,6 +108,7 @@ async function main(): Promise<void> {
       apiKeyFor,
       catalog,
       limits: cfg.limits,
+      capabilityTtlMs: cfg.capability_probe_ttl_days * 86_400_000,
       policyOverrides: compilePolicy({
         mode: cfg.policy.mode,
         always_ask: cfg.policy.always_ask,

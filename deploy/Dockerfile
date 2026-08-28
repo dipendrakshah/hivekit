@@ -5,7 +5,17 @@ FROM oven/bun:1 AS build
 WORKDIR /app
 # No glob on the lockfile: a missing bun.lock must fail right here,
 # loudly — not surface later as a confusing --frozen-lockfile error.
-COPY package.json bun.lock ./
+# All workspace manifests must exist BEFORE install, or bun resolves no
+# workspaces and vite/@hivekit/* deps silently vanish (build fails loudly here).
+COPY package.json bun.lock tsconfig.base.json tsconfig.json ./
+COPY apps/gateway/package.json apps/gateway/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY packages/protocol/package.json packages/protocol/package.json
+COPY packages/memory/package.json packages/memory/package.json
+COPY packages/models/package.json packages/models/package.json
+COPY packages/tools/package.json packages/tools/package.json
+COPY packages/connectors/package.json packages/connectors/package.json
+COPY packages/routines/package.json packages/routines/package.json
 RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
@@ -14,7 +24,15 @@ RUN bun run build
 # ships in the final image.
 FROM oven/bun:1 AS deps
 WORKDIR /app
-COPY package.json bun.lock ./
+COPY package.json bun.lock tsconfig.base.json tsconfig.json ./
+COPY apps/gateway/package.json apps/gateway/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY packages/protocol/package.json packages/protocol/package.json
+COPY packages/memory/package.json packages/memory/package.json
+COPY packages/models/package.json packages/models/package.json
+COPY packages/tools/package.json packages/tools/package.json
+COPY packages/connectors/package.json packages/connectors/package.json
+COPY packages/routines/package.json packages/routines/package.json
 RUN bun install --frozen-lockfile --production
 
 FROM oven/bun:1-slim

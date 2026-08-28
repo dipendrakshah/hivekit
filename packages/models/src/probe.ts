@@ -34,7 +34,7 @@ export interface ProbeOutcome {
 }
 
 export async function probeModel(
-  ref: { id: string; provider: "openai_compat" | "anthropic" },
+  ref: { id: string; provider: import("./types").ProviderId },
   attribution: CallAttribution,
   deps: ProbeDeps,
 ): Promise<ProbeOutcome> {
@@ -58,7 +58,7 @@ const PROBE_TOOL: ToolDef = {
 };
 
 async function runProbes(
-  ref: { id: string; provider: "openai_compat" | "anthropic" },
+  ref: { id: string; provider: import("./types").ProviderId },
   attribution: CallAttribution,
   complete: ProbeDeps["complete"],
 ): Promise<CapabilityVector> {
@@ -122,7 +122,7 @@ async function runProbes(
 
 async function q(
   complete: ProbeDeps["complete"],
-  ref: { id: string; provider: "openai_compat" | "anthropic" },
+  ref: { id: string; provider: import("./types").ProviderId },
   attribution: CallAttribution,
   partial: Partial<CompletionRequest> & { messages: CompletionRequest["messages"] },
 ): Promise<Completion> {

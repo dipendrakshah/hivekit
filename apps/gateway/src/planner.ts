@@ -68,7 +68,7 @@ export interface PlannerDeps {
   threadSummary: string;
   /** The single completion call — injected so tests fake it deterministically. */
   complete: (req: CompletionRequest) => Promise<{ text: string; model: string }>;
-  model: { provider: "openai_compat" | "anthropic"; id: string };
+  model: { provider: import("@hivekit/models").ProviderId; id: string };
   attribution: { thread_id: string; job_id: string; task_id: string | null };
 }
 

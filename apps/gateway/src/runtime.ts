@@ -26,7 +26,7 @@ import { makeSqliteSpendLogger, ensureSpendMigration, jobSpendUsd } from "./spen
 import { journalAppend } from "./db";
 
 export interface ModelConfig {
-  provider: "openai_compat" | "anthropic";
+  provider: import("@hivekit/models").ProviderId;
   model: string;
   fallback?: string;
 }
@@ -52,6 +52,8 @@ export interface RuntimeDeps {
   policyOverrides?: Partial<Record<import("@hivekit/tools").ToolName, import("@hivekit/tools").Policy>>;
   /** Pre-seeded capability cache (tests inject ALL_CAPABLE; prod probes fresh). */
   capabilities?: Map<string, import("@hivekit/models").ProbeRecord>;
+  /** Config: how long a probe verdict is trusted (capability_probe_ttl_days). */
+  capabilityTtlMs?: number;
 }
 
 export class MasterRuntime {
@@ -414,7 +416,7 @@ export class MasterRuntime {
       registry: () => ({ provider, baseUrl: reg.base_url.replace(/\/$/, ""), apiKey }),
       catalog: this.deps.catalog,
       spend: this.#spend,
-      capabilityTtlMs: 24 * 3600_000,
+      capabilityTtlMs: this.deps.capabilityTtlMs ?? 24 * 3600_000,
       capabilities: this.#caps,
       fallbackFor: (m) => {
         const fb = m.id === this.deps.models.master.model ? this.deps.models.master.fallback : this.deps.models.worker.fallback;
