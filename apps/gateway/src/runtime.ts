@@ -69,6 +69,21 @@ export class MasterRuntime {
     this.#caps = deps.capabilities ?? new Map();
   }
 
+  /**
+   * Re-wire after the server exists (main.ts constructs `runtime` before
+   * `createServer`, so the real broadcaster isn't available yet — same
+   * chicken-and-egg JobRunner solves with setBroadcaster). Mutating
+   * `deps.broadcast` is legal: `deps` itself is a private readonly
+   * *binding*, but `RuntimeDeps.broadcast` is not a readonly property.
+   */
+  setBroadcaster(fn: (event: string, payload: unknown) => void): void {
+    this.deps.broadcast = fn;
+  }
+
+  setOnDelta(fn: (threadId: string, text: string) => void): void {
+    this.deps.onDelta = fn;
+  }
+
   // ------------------------------------------------------------------ entries
 
   async startJob(threadId: string, userMessage: string): Promise<string> {

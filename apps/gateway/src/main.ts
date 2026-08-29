@@ -148,7 +148,7 @@ async function main(): Promise<void> {
         always_ask: cfg.policy.always_ask,
         exec_allowlist: cfg.policy.exec_allowlist,
       }).overrides,
-      broadcast: () => {}, // re-wired below, same pattern as jobs
+      broadcast: () => {}, // re-wired below via runtime.setBroadcaster, same pattern as jobs
       memoryBlockFor: (threadId) => {
         try {
           const slug = db.query("SELECT slug FROM threads WHERE id = ?").get(threadId) as { slug: string } | undefined;
@@ -167,7 +167,7 @@ async function main(): Promise<void> {
           return new ThreadWorkspace(threadsDir, slug.slug).readInstructions();
         } catch { return ""; }
       },
-      onDelta: () => {}, // re-wired below via gw.broadcast? deltas go through relay in server; keep no-op
+      onDelta: () => {}, // re-wired below via runtime.setOnDelta, straight to event.thread.delta
       fetchFn: undefined,
     });
     void apiKeyFor; void hasModels;
@@ -192,6 +192,12 @@ async function main(): Promise<void> {
 
   // Broadcast to the live socket set — set explicitly, no private-field cast.
   jobs.setBroadcaster(gw.broadcast);
+  if (runtime) {
+    runtime.setBroadcaster(gw.broadcast);
+    // Live-typing effect only; the authoritative row lands via insertSystem's
+    // own broadcast once text is final — this never touches message storage.
+    runtime.setOnDelta((threadId, text) => gw.broadcast("event.thread.delta", { thread_id: threadId, delta: text }));
+  }
 
   const recovered = jobs.recoverOnBoot();
   if (recovered.resumed > 0) {
