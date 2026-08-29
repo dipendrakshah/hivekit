@@ -1,0 +1,104 @@
+/*
+ * Hivekit web — shadcn/ui design tokens on Tailwind v4.
+ * The palette is the design mock's law (docs/ui/app.html): warm dark ground,
+ * copper primary, sage success, IBM Plex. Mapped onto shadcn token names so
+ * vendored shadcn components style themselves with zero drift.
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.65rem;
+  --background: #0b0a08;
+  --foreground: #ece8df;
+  --card: #1c1a16;
+  --card-foreground: #ece8df;
+  --popover: #1c1a16;
+  --popover-foreground: #ece8df;
+  --primary: #d4783a;
+  --primary-foreground: #191209;
+  --secondary: #241f18;
+  --secondary-foreground: #ece8df;
+  --muted: #221f1a;
+  --muted-foreground: #9a9286;
+  --accent: #2a231c;
+  --accent-foreground: #f0c9a8;
+  --destructive: #c45c4a;
+  --destructive-foreground: #fff5f2;
+  --border: #2e2a24;
+  --input: #2e2a24;
+  --ring: #d4783a;
+  --chart-1: #d4783a;
+  --chart-2: #7a9e7e;
+  --chart-3: #c9a227;
+  --chart-4: #9a9286;
+  --chart-5: #c45c4a;
+  --sidebar: #16140f;
+  --sidebar-foreground: #ece8df;
+  --sidebar-primary: #d4783a;
+  --sidebar-primary-foreground: #191209;
+  --sidebar-accent: #2a231c;
+  --sidebar-accent-foreground: #f0c9a8;
+  --sidebar-border: #2e2a24;
+  --sidebar-ring: #d4783a;
+  /* hivekit extras */
+  --sage: #7a9e7e;
+  --warn: #c9a227;
+  --danger: #c45c4a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sage: var(--sage);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    overflow-x: hidden; /* DoD: page body never scrolls horizontally */
+  }
+}
