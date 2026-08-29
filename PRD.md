@@ -198,7 +198,7 @@ bot's; the sidecars under `memory/` never enter a prompt.
   candidates|audit`, plus `log|diff|revert` when git-backing is on. **"Why does my bot believe
   this?" is one command**, and the answer names the jobs.
 
-## 8. Non-functional requirements## 8. Non-functional requirements
+## 8. Non-functional requirements
 
 - NFR-1. Single Bun process + SQLite (WAL). No second database. One volume to back up.
 - NFR-2. Gateway restart < 5 s; jobs resume from persisted state after crash/reboot.

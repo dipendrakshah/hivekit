@@ -509,10 +509,12 @@ SQLite via `bun:sqlite`: WAL mode, prepared statements, raw SQL (`synchronous=NO
 ## 7. Setup, in practice
 
 ```sh
-git clone && cp .env.example .env   # HIVEKIT_TOKEN, HIVEKIT_MASTER_KEY, PUBLIC_URL
-docker compose up -d                # Caddy + hivekit + volume
+git clone https://github.com/dipendrakshah/xcog-bot hivekit && cd hivekit
+cp config/hivekit.example.yaml config/hivekit.yaml
+# .env holds two generated secrets, not a copied template — see deploy/README.md
+docker compose -f deploy/docker-compose.yml up -d   # Caddy + hivekit + volume
 open https://hive.example.com       # set passkey → paste key → message the hive
-hivekit doctor                      # container exec: config, vault, provider ping, disk
+docker compose exec hivekit hivekit doctor          # config, vault, provider ping, disk
 ```
 
 ## 8. Evolution valve
